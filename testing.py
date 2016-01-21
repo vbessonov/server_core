@@ -347,6 +347,7 @@ class DummyHTTPClient(object):
 
 import os
 from sqlalchemy.orm.session import Session
+from sqlalchemy import func
 
 from model import (
     Patron,

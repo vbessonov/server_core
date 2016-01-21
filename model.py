@@ -67,8 +67,13 @@ from sqlalchemy.sql.expression import (
 from sqlalchemy.exc import (
     IntegrityError
 )
+from sqlalchemy.ext.hybrid import (
+    Comparator,
+    hybrid_property,
+)
 from sqlalchemy import (
     create_engine, 
+    func,
     Binary,
     Boolean,
     Column,
@@ -332,16 +337,17 @@ class Patron(Base):
     # Depending on library policy it may be possible to automatically
     # derive the patron's account type from their authorization
     # identifier.
-    _external_type = Column(Unicode, index=True, name="external_type")
+    external_type = Column(Unicode, index=True)
 
     # An identifier used by the patron that gives them the authority
-    # to borrow books. This identifier may change over time.
-    authorization_identifier = Column(Unicode, unique=True, index=True)
+    # to borrow books, stored in hashed form. This identifier may change
+    # over time.
+    authorization_identifier_hashed = Column(Unicode, unique=True, index=True)
 
     # An identifier used by the patron that authenticates them,
-    # but does not give them the authority to borrow books. i.e. their
-    # website username.
-    username = Column(Unicode, unique=True, index=True)
+    # but does not give them the authority to borrow books, stored in
+    # hashed form. i.e. their website username.
+    username_hashed = Column(Unicode, unique=True, index=True)
 
     # The last time this record was synced up with an external library
     # system.
@@ -379,19 +385,45 @@ class Patron(Base):
         loans = self.works_on_loan()
         return set(holds + loans)
 
-    @property
-    def external_type(self):
-        if self.authorization_identifier and not self._external_type:
+    class HashedIdentifierComparator(Comparator):
+        def __init__(self, hashed_identifier):
+            self.hashed_identifier = hashed_identifier
+        def __eq__(self, identifier):
+            return self.hashed_identifier == func.crypt(identifier, self.hashed_identifier)
+
+    @hybrid_property
+    def authorization_identifier(self):
+        raise NotImplementedError("Comparison only supported in the database")
+
+    @authorization_identifier.comparator
+    def authorization_identifier(self):
+        return Patron.HashedIdentifierComparator(self.authorization_identifier_hashed)
+
+    @authorization_identifier.setter
+    def authorization_identifier(self, value):
+        self.authorization_identifier_hashed = func.crypt(value, func.gen_salt('bf', 8))
+        if not self.external_type:
             policy = Configuration.policy(
                 self.EXTERNAL_TYPE_REGULAR_EXPRESSION)
             if policy:
                 match = re.compile(policy).search(
-                    self.authorization_identifier)
+                    value)
                 if match:
                     groups = match.groups()
                     if groups:
-                        self._external_type = groups[0]
-        return self._external_type
+                        self.external_type = groups[0]
+
+    @hybrid_property
+    def username(self):
+        raise NotImplementedError("Comparison only supported in the database")
+
+    @username.comparator
+    def username(self):
+        return Patron.HashedIdentifierComparator(self.username_hashed)
+
+    @username.setter
+    def username(self, value):
+        self.username_hashed = func.crypt(value, func.gen_salt('bf', 8))
 
     def can_borrow(self, work, policy):
         """Return true if the given policy allows this patron to borrow the

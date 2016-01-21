@@ -1713,30 +1713,44 @@ class TestPatron(DatabaseTest):
 
     def test_external_type_regular_expression(self):
         patron = self._patron("234")
-        patron.authorization_identifier = "A123"
         key = Patron.EXTERNAL_TYPE_REGULAR_EXPRESSION
         with temp_config() as config:
 
             config[Configuration.POLICIES] = {}
 
             config[Configuration.POLICIES][key] = None
+            patron.authorization_identifier = "A123"
             eq_(None, patron.external_type)
+            patron.external_type = None
 
             config[Configuration.POLICIES][key] = "([A-Z])"
+            patron.authorization_identifier = "A123"
             eq_("A", patron.external_type)
-            patron._external_type = None
+            patron.external_type = None
 
             config[Configuration.POLICIES][key] = "([0-9]$)"
+            patron.authorization_identifier = "A123"
             eq_("3", patron.external_type)
-            patron._external_type = None
+            patron.external_type = None
 
             config[Configuration.POLICIES][key] = "A"
+            patron.authorization_identifier = "A123"
             eq_(None, patron.external_type)
-            patron._external_type = None
+            patron.external_type = None
 
             config[Configuration.POLICIES][key] = "(not a valid regexp"
-            assert_raises(TypeError, lambda x: patron.external_type)
-            patron._external_type = None
+            def set_authorization_identifier():
+                patron.authorization_identifier = "A123"
+            assert_raises(Exception, set_authorization_identifier)
+            patron.external_type = None
+
+    def test_authorization_identifier_hashed(self):
+        patron = self._patron('456')
+        patron.authorization_identifier = 'abcd'
+        assert_raises(NotImplementedError, lambda: patron.authorization_identifier)
+        db_patrons = self._db.query(Patron).filter_by(authorization_identifier="abcd").all()
+        eq_(1, len(db_patrons))
+        eq_('456', db_patrons[0].external_identifier)
 
 
 class TestComplaint(DatabaseTest):
