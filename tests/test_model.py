@@ -835,27 +835,13 @@ class TestWork(DatabaseTest):
     def test_set_presentation_ready(self):
         work = self._work(with_license_pool=True)
         primary = work.primary_edition
-        work.set_presentation_ready_based_on_content()
-        eq_(False, work.presentation_ready)
-        
-        # This work is not presentation ready because it has no
-        # cover. If we record the fact that we tried and failed to
-        # find a cover, it will be considered presentation ready.
-        work.primary_edition.no_known_cover = True
-        work.set_presentation_ready_based_on_content()
-        eq_(True, work.presentation_ready)
-
-        # It would also work to add a cover, of course.
-        work.primary_edition.cover_thumbnail_url = "http://example.com/"
-        work.primary_edition.no_known_cover = False
-        work.set_presentation_ready_based_on_content()
-        eq_(True, work.presentation_ready)
-
-        # Remove the title, and the work stops being presentation
-        # ready.
         primary.title = None
         work.set_presentation_ready_based_on_content()
-        eq_(False, work.presentation_ready)        
+        eq_(False, work.presentation_ready)
+
+        # This work is not presentation ready because it has no
+        # title, add a title, and it will be considered presentation
+        # ready.   
         primary.title = u"foo"
         work.set_presentation_ready_based_on_content()
         eq_(True, work.presentation_ready)        
