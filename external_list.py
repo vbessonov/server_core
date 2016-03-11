@@ -257,7 +257,7 @@ class MembershipManager(object):
 
     def __init__(self, custom_list, log=None):
         self.log = log or logging.getLogger(
-            "Membership manager for %s" % custom_list.name
+            "Membership manager for %s" % custom_list.foreign_identifier
         )
         self._db = Session.object_session(custom_list)
         self.custom_list = custom_list
