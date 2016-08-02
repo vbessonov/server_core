@@ -616,6 +616,19 @@ class Hold(Base, LoanAndHoldMixin):
     )
 
 
+class DeviceIdentifier(Base):
+    """An identifier for a device associated with the patron."""
+
+    DEVICE_LIST_LINK_RELATION = "http://librarysimplified.org/terms/rel/device-ids"
+    ADOBE_TYPE = "http://librarysimplified.org/terms/devices/adobe"
+
+    __tablename__ = 'datasources'
+    id = Column(Integer, primary_key=True)
+    patron_id = Column(Integer, ForeignKey('patrons.id'), index=True)
+    type = Column(String)
+    identifier = Column(Unicode)
+
+
 class DataSource(Base):
 
     """A source for information about books, and possibly the books themselves."""
