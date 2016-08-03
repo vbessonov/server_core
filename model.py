@@ -403,6 +403,7 @@ class Patron(Base):
 
     loans = relationship('Loan', backref='patron')
     holds = relationship('Hold', backref='patron')
+    device_identifiers = relationship('DeviceIdentifier', backref='patron')
 
     # One Patron can have many associated Credentials.
     credentials = relationship("Credential", backref="patron")
@@ -617,13 +618,22 @@ class Hold(Base, LoanAndHoldMixin):
 
 
 class DeviceIdentifier(Base):
-    """An identifier for a device associated with the patron."""
+    """Some kind of a third-party identifier associated with a patron.
 
-    DEVICE_LIST_LINK_RELATION = "http://librarysimplified.org/terms/rel/device-ids"
+    This is similar to a Credential but we store them in separate
+    tables because 1) a DeviceIdentifier doesn't grant any privileges,
+    it just identifies something, and 2) unlike Credentials, which we
+    keep secret even from the patrons whose credentials we're using,
+    DeviceIdentifiers are sometimes echoed back to authenticated patrons.
+    """
+
+    DEVICE_LIST_LINK_RELATION = "http://librarysimplified.org/terms/rel/device-identifiers"
     ADOBE_TYPE = "http://librarysimplified.org/terms/devices/adobe"
 
     __tablename__ = 'datasources'
     id = Column(Integer, primary_key=True)
+
+    # One patron can have multiple DeviceIdentifiers of a given type.
     patron_id = Column(Integer, ForeignKey('patrons.id'), index=True)
     type = Column(String)
     identifier = Column(Unicode)
