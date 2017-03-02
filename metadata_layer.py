@@ -505,7 +505,9 @@ class MetaToModelUtility(object):
                 if (identifier and identifier.primarily_identifies and identifier.primarily_identifies[0]): 
                     edition = identifier.primarily_identifies[0]
             elif isinstance(model_object, Edition):
-                pool = model_object.license_pool
+                # pool is irrelevant since an Edition may be
+                # associated with more than one LicensePool.
+                pool = None
                 identifier = model_object.primary_identifier
                 edition = model_object
         if edition and edition.title:

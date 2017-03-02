@@ -655,14 +655,14 @@ class TestOPDSImporter(OPDSImporterTest):
         path = os.path.join(self.resource_path, "metadata_wrangler_overdrive.opds")
         feed = open(path).read()
 
-        edition, is_new = self._edition(
+        edition, pool = self._edition(
             DataSource.OVERDRIVE, Identifier.OVERDRIVE_ID,
             with_license_pool=True
         )
-        edition.license_pool.calculate_work()
-        work = edition.license_pool.work
+        pool.calculate_work()
+        work = pool.work
 
-        old_license_pool = edition.license_pool
+        old_license_pool = pool
         feed = feed.replace("{OVERDRIVE ID}", edition.primary_identifier.identifier)
 
         imported_editions, imported_pools, imported_works, failures = (
@@ -674,7 +674,7 @@ class TestOPDSImporter(OPDSImporterTest):
         eq_("The Green Mouse", imported_editions[0].title)
 
         # But the license pools have not changed.
-        eq_(edition.license_pool, old_license_pool)
+        eq_(edition.license_pools, [old_license_pool])
         eq_(work.license_pools, [old_license_pool])
 
 

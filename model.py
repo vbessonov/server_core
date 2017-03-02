@@ -2624,13 +2624,15 @@ class Edition(Base):
         return r
 
     @property
-    def license_pool(self):
-        """The Edition's corresponding LicensePool, if any.
+    def license_pools(self):
+        """The Edition's corresponding LicensePools, if any.
         """
         _db = Session.object_session(self)
-        return get_one(_db, LicensePool,
-                       data_source=self.data_source,
-                       identifier=self.primary_identifier)
+        return _db.query(
+            LicensePool).filter(
+                LicensePool.data_source==self.data_source).filter(
+                    LicensePool.identifier==self.primary_identifier
+                )
 
     def equivalent_identifiers(self, levels=3, threshold=0.5, type=None):
         """All Identifiers equivalent to this
@@ -5841,11 +5843,6 @@ class LicensePool(Base):
     # link for this LicensePool.
     _open_access_download_url = Column(Unicode, name="open_access_download_url")
     
-    # A Identifier should have at most one LicensePool.
-    __table_args__ = (
-        UniqueConstraint('identifier_id'),
-    )
-
     def __repr__(self):
         if self.identifier:
             identifier = "%s/%s" % (self.identifier.type, 
@@ -6618,7 +6615,7 @@ class LicensePool(Base):
         return lpdm
 
 
-Index("ix_licensepools_data_source_id_identifier_id", LicensePool.data_source_id, LicensePool.identifier_id, unique=True)
+Index("ix_licensepools_data_source_id_identifier_id", LicensePool.data_source_id, LicensePool.identifier_id)
 
 
 class RightsStatus(Base):

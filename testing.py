@@ -223,7 +223,7 @@ class DatabaseTest(object):
               audience=None, fiction=True, with_license_pool=False, 
               with_open_access_download=False, quality=0.5,
               presentation_edition=None):
-        pool = None
+        pools = []
         if with_open_access_download:
             with_license_pool = True
         language = language or "eng"
@@ -249,10 +249,12 @@ class DatabaseTest(object):
             )
             if with_license_pool:
                 presentation_edition, pool = presentation_edition
+                pools.append(pool)
         else:
-            pool = presentation_edition.license_pool
+            pools.extend(presentation_edition.license_pools)
         if with_open_access_download:
-            pool.open_access = True
+            for pool in pools:
+                pool.open_access = True
         if new_edition:
             presentation_edition.calculate_presentation()
         work, ignore = get_one_or_create(
@@ -269,14 +271,14 @@ class DatabaseTest(object):
         work.set_presentation_edition(presentation_edition)
         work.calculate_presentation_edition()
 
-        if pool != None:
+        for pool in pools:
             # make sure the pool's presentation_edition is set, 
             # bc loan tests assume that.
-            if not work.license_pools:
+            if pool not in work.license_pools:
                 work.license_pools.append(pool)
-
             pool.set_presentation_edition()
 
+        if work.license_pools:
             # This is probably going to be used in an OPDS feed, so
             # fake that the work is presentation ready.
             work.presentation_ready = True
@@ -598,10 +600,10 @@ class DatabaseTest(object):
                 print "    Edition.data_source.name=%s|" % edition.data_source.name
             else:
                 print "    No Edition.data_source."
-            if (edition.license_pool):
-                print "    Edition.license_pool.id=%s|" % edition.license_pool.id
+            if (edition.license_pools):
+                print "    Edition.license_pools=%s|" % ", ".join([x.id for x in edition.license_pools])
             else:
-                print "    No Edition.license_pool."
+                print "    No Edition.license_pools."
 
             print "    Edition.title=%s|" % edition.title
             print "    Edition.author=%s|" % edition.author
