@@ -2604,7 +2604,7 @@ class TestWorkConsolidation(DatabaseTest):
 
         eq_(work1, work2)
 
-        eq_(set(edition1.license_pools.all()+edition2.license_pools.all()),
+        eq_(set(edition1.license_pools+edition2.license_pools),
             set(work1.license_pools))
 
 
@@ -5352,7 +5352,7 @@ class TestMaterializedViews(DatabaseTest):
         # necessarily associate it with that work's presentation
         # edition, because only one of those LicensePools has the
         # Identifier to match the presentation edition.
-        eq_([pool1], work.presentation_edition.license_pools.all())
+        eq_([pool1], work.presentation_edition.license_pools)
         work.presentation_ready = True
         work.simple_opds_entry = '<entry>'
         work.assign_genres_from_weights({classifier.Fantasy : 1})

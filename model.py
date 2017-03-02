@@ -2623,17 +2623,6 @@ class Edition(Base):
                  **kwargs)
         return r
 
-    @property
-    def license_pools(self):
-        """The Edition's corresponding LicensePools, if any.
-        """
-        _db = Session.object_session(self)
-        return _db.query(
-            LicensePool).filter(
-                LicensePool.data_source==self.data_source).filter(
-                    LicensePool.identifier==self.primary_identifier
-                )
-
     def equivalent_identifiers(self, levels=3, threshold=0.5, type=None):
         """All Identifiers equivalent to this
         Edition's primary identifier, at the given level of recursion.
@@ -5841,7 +5830,7 @@ class LicensePool(Base):
     # This lets us cache the work of figuring out the best open access
     # link for this LicensePool.
     _open_access_download_url = Column(Unicode, name="open_access_download_url")
-    
+   
     def __repr__(self):
         if self.identifier:
             identifier = "%s/%s" % (self.identifier.type, 
@@ -6615,6 +6604,14 @@ class LicensePool(Base):
 
 
 Index("ix_licensepools_data_source_id_identifier_id", LicensePool.data_source_id, LicensePool.identifier_id)
+
+
+# Now that Edition and LicensePool are both defined, define their
+# one-to-many relationship.
+Edition.license_pools = relationship(
+    LicensePool, primaryjoin="LicensePool.identifier_id==Edition.primary_identifier_id and LicensePoool.data_source_id==Edition.data_source_id",
+    foreign_keys=[LicensePool.data_source_id, LicensePool.identifier_id],
+)
 
 
 class RightsStatus(Base):
