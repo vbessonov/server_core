@@ -494,7 +494,7 @@ class TestOPDSImporter(OPDSImporterTest):
         # metadata wrangler. No Work has been created.
         eq_(DataSource.METADATA_WRANGLER, crow.data_source.name)
         eq_(None, crow.work)
-        eq_([], crow.license_pools.all())
+        eq_([], crow.license_pools)
         eq_(Edition.BOOK_MEDIUM, crow.medium)
 
         # not even the 'mouse'
@@ -674,8 +674,8 @@ class TestOPDSImporter(OPDSImporterTest):
         eq_("The Green Mouse", imported_editions[0].title)
 
         # But the license pools have not changed.
-        eq_(edition.license_pools.all(), [old_license_pool])
-        eq_(work.license_pools.all(), [old_license_pool])
+        eq_(edition.license_pools, [old_license_pool])
+        eq_(work.license_pools, [old_license_pool])
 
 
     def test_import_from_license_source(self):
