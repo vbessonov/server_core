@@ -463,10 +463,12 @@ class CoverageProvider(BaseCoverageProvider):
         """
         return DataSource.lookup(self._db, self.output_source_name)
 
-    def license_pool(self, identifier):
-        """Finds or creates the LicensePool for a given Identifier."""
-        license_pool = identifier.licensed_through
-        if not license_pool:
+    def license_pools(self, identifier):
+        """Finds the LicensePools for a given Identifier, creating one if 
+        necessary and possible.
+        """
+        license_pools = identifier.licensed_through
+        if not license_pools:
             if self.CAN_CREATE_LICENSE_POOLS:
                 # The source of this data also provides license
                 # pools, so it's okay to automatically create
@@ -475,38 +477,48 @@ class CoverageProvider(BaseCoverageProvider):
                     self._db, self.output_source, identifier.type, 
                     identifier.identifier
                 )
+                license_pools = [license_pool]
             else:
-                return None
-        return license_pool
+                return []
+        return license_pools
 
-    def edition(self, identifier):
-        """Finds or creates the Edition for a given Identifier."""
-        license_pool = self.license_pool(identifier)
-        if not license_pool:
-            e = "No license pool available"
-            return CoverageFailure(identifier, e, data_source=self.output_source, transient=True)
+    def editions(self, identifier):
+        """Finds or creates one or more Editions for a given Identifier.
 
-        edition, ignore = Edition.for_foreign_id(
-            self._db, license_pool.data_source, identifier.type,
-            identifier.identifier
-        )
-        return edition
-
-    def work(self, identifier):
-        """Finds or creates the Work for a given Identifier.
-        
-        :return: The Work (if it could be found) or an appropriate
-        CoverageFailure (if not).
+        Each LicensePool with a given Identifier and Datasource will have
+        its own distinct Edition.
         """
-        license_pool = self.license_pool(identifier)
-        if not license_pool:
-            e = "No license pool available"
+        license_pools = self.license_pools(identifier)
+        if not license_pools:
+            e = "No license pools available"
             return CoverageFailure(identifier, e, data_source=self.output_source, transient=True)
-        work, created = license_pool.calculate_work(even_if_no_author=True)
-        if not work:
-            e = "Work could not be calculated"
+        editions = set()
+        for pool in license_pools:
+            edition, ignore = Edition.for_foreign_id(
+                self._db, license_pool.data_source, identifier.type,
+                identifier.identifier
+            )
+            editions.add(edition)
+        return editions
+
+    def works(self, identifier):
+        """Finds or creates Works for a given Identifier.
+        
+        :return: A set of Works (if they all could be found) or an
+        appropriate CoverageFailure (if any could not).
+        """
+        license_pools = self.license_pools(identifier)
+        works = set()
+        if not license_pools:
+            e = "No license pools available"
             return CoverageFailure(identifier, e, data_source=self.output_source, transient=True)
-        return work
+        for pool in license_pools:
+            work, created = license_pool.calculate_work(even_if_no_author=True)
+            if not work:
+                e = "Work could not be calculated"
+                return CoverageFailure(identifier, e, data_source=self.output_source, transient=True)
+            works.add(work)
+        return works
 
 
     def set_metadata(self, identifier, metadata, 
@@ -524,8 +536,9 @@ class CoverageProvider(BaseCoverageProvider):
         and the LicensePool for the passed-in Identifier, updates them, 
         then finds or creates a Work for them.
 
-        TODO:  Makes assumption of one license pool per identifier.  In a 
-        later branch, this will change.
+        TODO:  Makes assumption of one license pool per identifier.  To
+           avoid this assumption we need to have a Collection to work with.
+           LicensePool + Identifier + Collection is unique.
         TODO:  Update doc string removing reference to past function.
 
         :return: The Identifier (if successful) or an appropriate

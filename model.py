@@ -1377,10 +1377,10 @@ class Identifier(Base):
         "Edition", backref="primary_identifier"
     )
 
-    # One Identifier may serve as the identifier for
-    # a single LicensePool.
+    # One Identifier may serve as the identifier for many
+    # LicensePools.
     licensed_through = relationship(
-        "LicensePool", backref="identifier", uselist=False, lazy='joined',
+        "LicensePool", backref="identifier", lazy='joined',
     )
 
     # One Identifier may have many Links.
@@ -5087,7 +5087,6 @@ class Resource(Base):
                 if (champion_media_type_priority is None
                     or (media_priority is not None
                         and media_priority < champion_media_type_priority)):
-                    print "%s beats %s" % (media_priority, champion_media_type_priority)
                     champions = [r]
                     champion_score = r.quality
                     champion_media_type_priority = media_priority

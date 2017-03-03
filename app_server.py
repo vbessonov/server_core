@@ -304,14 +304,17 @@ class URNLookupController(object):
 
         if not identifier.licensed_through:
             # The default URNLookupController cannot look up an
-            # Identifier that has no associated LicensePool.
+            # Identifier that has no associated LicensePools.
             return self.add_message(urn, 404, self.UNRECOGNIZED_IDENTIFIER)
             
         # If we get to this point, there is a LicensePool for this
         # identifier.
-        work = identifier.licensed_through.work
+        for pool in identifier.licensed_through:
+            if pool.work:
+                work = pool.work
+                break
         if not work:
-            # There is a LicensePool but no Work. 
+            # There are LicensePools but none of them have a Work. 
             return self.add_message(urn, 202, self.WORK_NOT_CREATED)
             
         if not work.presentation_ready:
