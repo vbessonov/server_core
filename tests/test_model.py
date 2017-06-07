@@ -6158,3 +6158,18 @@ class TestAdmin(DatabaseTest):
         assert_raises(NotImplementedError, lambda: admin.password)
         db_admins = self._db.query(Admin).filter(Admin.password=="password").all()
         eq_([admin], db_admins)
+
+    def test_with_password(self):
+        eq_([], Admin.with_password(self._db).all())
+
+        admin, ignore = create(self._db, Admin, email="admin@nypl.org")
+        eq_([], Admin.with_password(self._db).all())
+
+        admin.password = "password"
+        eq_([admin], Admin.with_password(self._db).all())
+
+        admin2, ignore = create(self._db, Admin, email="admin2@nypl.org")
+        eq_([admin], Admin.with_password(self._db).all())
+
+        admin2.password = "password2"
+        eq_(set([admin, admin2]), set(Admin.with_password(self._db).all()))
