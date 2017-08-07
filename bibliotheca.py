@@ -67,7 +67,7 @@ class BibliothecaAPI(object):
 
     log = logging.getLogger("Bibliotheca API")
 
-    DEFAULT_VERSION = "2.0"
+    DEFAULT_VERSION = "3.0"
     DEFAULT_BASE_URL = "https://partner.yourcloudlibrary.com/"
     
     def __init__(self, collection):
