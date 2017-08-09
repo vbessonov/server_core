@@ -1296,7 +1296,6 @@ class TestOPDSImportMonitor(OPDSImporterTest):
             ValueError,
             "OPDSImportMonitor can only be run in the context of a Collection.",
             OPDSImportMonitor,
-            self._db,
             None,
             OPDSImporter,
         )
@@ -1306,7 +1305,6 @@ class TestOPDSImportMonitor(OPDSImporterTest):
             ValueError,
             "Collection .* is configured for protocol Overdrive, not OPDS import.",
             OPDSImportMonitor,
-            self._db,
             self._default_collection,
             OPDSImporter,
         )
@@ -1317,7 +1315,6 @@ class TestOPDSImportMonitor(OPDSImporterTest):
             ValueError,
             "Collection .* has no associated data source.",
             OPDSImportMonitor,
-            self._db,
             self._default_collection,
             OPDSImporter,
         )
@@ -1330,7 +1327,7 @@ class TestOPDSImportMonitor(OPDSImporterTest):
                 return 200, {}, feed
 
         monitor = OPDSImportMonitor(
-            self._db, self._default_collection,
+            self._default_collection,
             import_class=OPDSImporter,
         )
         timestamp = monitor.timestamp()
@@ -1341,7 +1338,6 @@ class TestOPDSImportMonitor(OPDSImporterTest):
         
         # Now import the editions.
         monitor = MockOPDSImportMonitor(
-            self._db,
             collection=self._default_collection,
             import_class=OPDSImporter,
         )
@@ -1401,7 +1397,7 @@ class TestOPDSImportMonitor(OPDSImporterTest):
 
     def test_follow_one_link(self):
         monitor = OPDSImportMonitor(
-            self._db, collection=self._default_collection,
+            collection=self._default_collection,
             import_class=OPDSImporter
         )
         feed = self.content_server_mini_feed
@@ -1445,7 +1441,7 @@ class TestOPDSImportMonitor(OPDSImporterTest):
         # Check coverage records are created.
 
         monitor = OPDSImportMonitor(
-            self._db, collection=self._default_collection,
+            collection=self._default_collection,
             import_class=DoomedOPDSImporter
         )
         self._default_collection.external_account_id = "http://root-url/index.xml"
@@ -1514,7 +1510,7 @@ class TestOPDSImportMonitor(OPDSImporterTest):
                 self.imports.append(feed)
 
         monitor = MockOPDSImportMonitor(
-            self._db, collection=self._default_collection,
+            collection=self._default_collection,
             import_class=OPDSImporter
         )
         

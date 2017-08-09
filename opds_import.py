@@ -1307,7 +1307,7 @@ class OPDSImportMonitor(CollectionMonitor):
     # entire OPDS feed.
     DEFAULT_START_TIME = CollectionMonitor.NEVER
 
-    def __init__(self, _db, collection, import_class,
+    def __init__(self, collection, import_class,
                  force_reimport=False, **import_class_kwargs):
         if not collection:
             raise ValueError(
@@ -1329,10 +1329,11 @@ class OPDSImportMonitor(CollectionMonitor):
 
         self.feed_url = collection.external_account_id
         self.force_reimport = force_reimport
+        _db = Session.object_session(collection)
         self.importer = import_class(
             _db, collection=collection, **import_class_kwargs
         )
-        super(OPDSImportMonitor, self).__init__(_db, collection)
+        super(OPDSImportMonitor, self).__init__(collection)
     
     def _get(self, url, headers):
         """Make the sort of HTTP request that's normal for an OPDS feed.
