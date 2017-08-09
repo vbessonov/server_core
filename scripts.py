@@ -187,7 +187,7 @@ class RunMonitorScript(Script):
                 "It would be better if you used RunCollectionMonitorScript directly."
             )
             RunCollectionMonitorScript(
-                self.collection_monitor, self._db, **self.collection_monitor_kwargs
+                self.collection_monitor, **self.collection_monitor_kwargs
             ).run()
 
 

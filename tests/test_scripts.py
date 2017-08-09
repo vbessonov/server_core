@@ -240,9 +240,9 @@ class OPDSCollectionMonitor(CollectionMonitor):
     SERVICE_NAME = "Test Monitor"
     PROTOCOL = ExternalIntegration.OPDS_IMPORT
 
-    def __init__(self, _db, test_argument=None, **kwargs):
+    def __init__(self, test_argument=None, **kwargs):
         self.test_argument = test_argument
-        super(OPDSCollectionMonitor, self).__init__(_db, **kwargs)
+        super(OPDSCollectionMonitor, self).__init__(**kwargs)
 
     def run_once(self, start, cutoff):
         self.collection.ran_with_argument = self.test_argument
