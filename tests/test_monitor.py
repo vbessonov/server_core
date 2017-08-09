@@ -186,22 +186,23 @@ class TestCollectionMonitor(DatabaseTest):
         c1 = self._collection(protocol=ExternalIntegration.OVERDRIVE)
         c2 = self._collection(protocol=ExternalIntegration.BIBLIOTHECA)
 
-        # The NoProtocolMonitor can be instantiated with either one,
-        # or with no Collection at all.
-        NoProtocolMonitor(self._db, c1)
-        NoProtocolMonitor(self._db, c2)
-        NoProtocolMonitor(self._db, None)
+        # The NoProtocolMonitor can be instantiated with either one.
+        NoProtocolMonitor(c1)
+        NoProtocolMonitor(c2)
+
+        # It cannot be instantiated without providing a Collection.
+        assert_raises(CollectionMissing, NoProtocolMonitor, None)
 
         # The OverdriveMonitor can only be instantiated with the first one.
-        OverdriveMonitor(self._db, c1)
+        OverdriveMonitor(c1)
         assert_raises_regexp(
             ValueError,
             "Collection protocol \(Bibliotheca\) does not match Monitor protocol \(Overdrive\)",
-            OverdriveMonitor, self._db, c2
+            OverdriveMonitor, c2
         )
         assert_raises(
             CollectionMissing,
-            OverdriveMonitor, self._db, None
+            OverdriveMonitor, None
         )
         
     def test_all(self):

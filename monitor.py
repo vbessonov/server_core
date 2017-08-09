@@ -4,6 +4,7 @@ import os
 import logging
 import time
 import traceback
+from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.functions import func
 from sqlalchemy.sql.expression import (
     or_,
@@ -198,7 +199,11 @@ class CollectionMonitor(Monitor):
     # instantiated with any Collection, or with no Collection at all.
     PROTOCOL = None
 
-    def __init__(self, _db, collection):
+    def __init__(self, collection):
+        if not collection:
+            raise CollectionMissing(
+                "No collection was provided to CollectionMonitor."
+            )
         cls = self.__class__
         self.protocol = cls.PROTOCOL
         if self.protocol:
@@ -211,6 +216,7 @@ class CollectionMonitor(Monitor):
                 )
             )
 
+        _db = Session.object_session(collection)
         super(CollectionMonitor, self).__init__(_db, collection)
     
     @classmethod
@@ -238,10 +244,10 @@ class CollectionMonitor(Monitor):
             Timestamp.timestamp.asc().nullsfirst()
         )
         for collection in collections:
-            yield cls(_db=_db, collection=collection, **constructor_kwargs)
+            yield cls(collection=collection, **constructor_kwargs)
 
 
-class SweepMonitor(CollectionMonitor):
+class SweepMonitor(Monitor):
     """A monitor that does some work for every item in a database table,
     then stops.
 
@@ -275,7 +281,7 @@ class SweepMonitor(CollectionMonitor):
         if not cls.MODEL_CLASS:
             raise ValueError("%s must define MODEL_CLASS" % cls.__name__)
         self.model_class = cls.MODEL_CLASS
-        super(SweepMonitor, self).__init__(_db, collection=collection)
+        super(SweepMonitor, self).__init__(_db=_db, collection=collection)
 
     def run(self):        
         timestamp = self.timestamp()
