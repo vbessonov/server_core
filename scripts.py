@@ -259,7 +259,7 @@ class RunCoverageProvidersScript(Script):
                 providers.remove(provider)
 
 
-class RunCollectionCoverageProviderScript(RunCoverageProvidersScript):
+class RunModelCoverageProviderScript(RunCoverageProvidersScript):
     """Run the same CoverageProvider code for all Collections that
     get their licenses from the appropriate place.
     """
@@ -272,6 +272,18 @@ class RunCollectionCoverageProviderScript(RunCoverageProvidersScript):
 
     def get_providers(self, _db, provider_class, **kwargs):
         return list(provider_class.all(_db, **kwargs))
+
+
+class RunCollectionCoverageProviderScript(RunModelCoverageProviderScript):
+    """Run the same CoverageProvider code for all Collections that
+    get their licenses from the appropriate place.
+    """
+
+
+class RunLibraryCoverageProviderScript(RunModelCoverageProviderScript):
+    """Run the same CoverageProvider code for all Libraries that have an
+    ExternalIntegration with the appropriate protocol.
+    """
 
 
 class InputScript(Script):

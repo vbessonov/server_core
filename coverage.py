@@ -679,22 +679,42 @@ class IdentifierCoverageProvider(BaseCoverageProvider):
         )
 
 
-class LibraryCoverageProvider(IdentifierCoverageProvider):
+class ModelCoverageProvider(IdentifierCoverageProvider):
+    """A CoverageProvider that covers all of the Identifiers associated
+    with a particular database model.
+
+    This CoverageProvider should be subclassed for an abstract CoverageProvider
+    class.
+    """
+    # By default, this type of CoverageProvider will provide coverage to all
+    # Identifiers associated with the given Library, regardless of their type.
+    INPUT_IDENTIFIER_TYPES = None
+
+    # Set this to the name of the protocol managed by this type of
+    # CoverageProvider. If this CoverageProvider can manage model objects
+    # for any protocol, leave this as None.
+    PROTOCOL = None
+
+    NO_SPECIFIED_MODEL = object()
+
+    MODEL_CLASS = NO_SPECIFIED_MODEL
+
+    @classmethod
+    def all(self, _db, **kwargs):
+        """Yield a sequence of CoverageProviders instances, one for
+        each relevant model object.
+        """
+        raise NotImplementedError()
+
+
+class LibraryCoverageProvider(ModelCoverageProvider):
     """A CoverageProvider that covers all the Identifiers currently
     licensed to a Collection in a given Library.
 
     You should subclass this CoverageProvider if you seek coverage from a
     third-party vendor that requires a Library-specific ExternalIntegration.
     """
-    # By default, this type of CoverageProvider will provide coverage to all
-    # Identifiers associated with the given Library, regardless of their type.
-    INPUT_IDENTIFIER_TYPES = None
-
     DEFAULT_BATCH_SIZE = 25
-
-    # Set this to the name of the protocol managed by this type of
-    # CoverageProvider.
-    PROTOCOL = None
 
     class ProtocolMissing(Exception):
         """LibraryCoverageProvider must define PROTOCOL"""
@@ -757,7 +777,7 @@ class LibraryCoverageProvider(IdentifierCoverageProvider):
             yield cls(library, **kwargs)
 
 
-class CollectionCoverageProvider(IdentifierCoverageProvider):
+class CollectionCoverageProvider(ModelCoverageProvider):
     """A CoverageProvider that covers all the Identifiers currently
     licensed to a given Collection.
 
@@ -787,16 +807,7 @@ class CollectionCoverageProvider(IdentifierCoverageProvider):
     `ExternalIntegration` class, such as
     ExternalIntegration.OPDS_IMPORT or ExternalIntegration.OVERDRIVE.
     """
-    # By default, this type of CoverageProvider will provide coverage to
-    # all Identifiers in the given Collection, regardless of their type.
-    INPUT_IDENTIFIER_TYPES = None
-    
     DEFAULT_BATCH_SIZE = 10
-
-    # Set this to the name of the protocol managed by this type of
-    # CoverageProvider. If this CoverageProvider can manage collections
-    # for any protocol, leave this as None.
-    PROTOCOL = None
 
     # By default, Works calculated by a CollectionCoverageProvider update
     # the ExternalSearchIndex. Set this value to True for applications that
