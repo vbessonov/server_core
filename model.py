@@ -157,6 +157,12 @@ class CollectionMissing(Exception):
     """
 
 
+class LibraryMissing(Exception):
+    """An operation was attempted that can only happen within the context of
+    a Library, but there was no Library available.
+    """
+
+
 class BaseMaterializedWork(object):
     """A mixin class for materialized views that incorporate Work and Edition."""
     pass

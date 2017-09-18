@@ -16,6 +16,8 @@ from model import (
     Edition,
     ExternalIntegration,
     Identifier,
+    Library,
+    LibraryMissing,
     LicensePool,
     Timestamp,
     Work,
@@ -675,6 +677,84 @@ class IdentifierCoverageProvider(BaseCoverageProvider):
         return self.failure(
             item, "Was ignored by CoverageProvider.", transient=True
         )
+
+
+class LibraryCoverageProvider(IdentifierCoverageProvider):
+    """A CoverageProvider that covers all the Identifiers currently
+    licensed to a Collection in a given Library.
+
+    You should subclass this CoverageProvider if you seek coverage from a
+    third-party vendor that requires a Library-specific ExternalIntegration.
+    """
+    # By default, this type of CoverageProvider will provide coverage to all
+    # Identifiers associated with the given Library, regardless of their type.
+    INPUT_IDENTIFIER_TYPES = None
+
+    DEFAULT_BATCH_SIZE = 25
+
+    # Set this to the name of the protocol managed by this type of
+    # CoverageProvider.
+    PROTOCOL = None
+
+    class ProtocolMissing(Exception):
+        """LibraryCoverageProvider must define PROTOCOL"""
+
+    def __init__(self, library, **kwargs):
+        """Constructor.
+
+        :param collection: Will provide coverage to all Identifiers with
+            a LicensePool associated with the given Library.
+        """
+        if not self.PROTOCOL:
+            raise self.ProtocolMissing()
+
+        if not isinstance(library, Library):
+            raise LibraryMissing(
+                "%s must be instantiated with a Library." % (
+                    self.__class__.__name__
+                )
+            )
+
+        integrations = filter(
+            lambda ei: ei.protocol==self.PROTOCOL, Library.integrations
+        )
+        if not integrations:
+            raise ValueError(
+                "%r has no ExternalIntegration for %s Protocol" %
+                (library, self.PROTOCOL)
+            )
+
+        self.library_id = library.id
+        _db = Session.object_session(library)
+        super(LibraryCoverageProvider, self).__init__(_db, **kwargs)
+
+    @property
+    def library(self):
+        """Retrieve the Library object associated with this CoverageProvider."""
+        if not self.library_id:
+            return None
+        return get_one(self._db, Library, id=self.library_id)
+
+    @classmethod
+    def all(self, _db, **kwargs):
+        """Yield a sequence of LibraryCoverageProvider instances, one for
+        every Library that has an integration with cls.PROTOCOL.
+
+        LibraryCoverageProviders will be yielded in a random order.
+
+        :param kwargs: Keyword arguments passed into the constructor for
+        LibraryCoverageProvider (or, more likely, one of its subclasses).
+        """
+        if not cls.PROTOCOL:
+            raise cls.ProtocolMissing()
+
+        libraries = _db.query(Library).join(Library.integrations).filter(
+            ExternalIntegration.protocol==cls.PROTOCOL
+        )
+
+        libraries = libraries.order_by(func.random())
+        for library in libraries:
+            yield cls(library, **kwargs)
 
 
 class CollectionCoverageProvider(IdentifierCoverageProvider):
