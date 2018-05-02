@@ -717,16 +717,13 @@ class LibraryInputScript(InputScript):
     def process_library(self, library):
         raise NotImplementedError()
 
-class NovelistSnapshot(LibraryInputScript):
+class NovelistSnapshotScript(LibraryInputScript):
 
     def do_run(self, *args, **kwargs):
         parsed = self.parse_command_line(self._db, *args, **kwargs)
         api = NoveListAPI.from_config(parsed.libraries[0])
         if (api):
-            api.get_all_isbns(self._db, parsed.libraries)
-
-    def process_library(self, library):
-        pass
+            api.put_isbns_novelist(self._db, parsed.libraries[0])
 
 class LaneSweeperScript(LibraryInputScript):
     """Do something to each lane in a library."""

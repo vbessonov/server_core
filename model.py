@@ -10611,6 +10611,8 @@ class ExternalIntegration(Base, HasFullTableCache):
     USERNAME = u"username"
     PASSWORD = u"password"
 
+    AUTHORIZED_IDENTIFIER = u"authorized_identifier"
+
     _cache = HasFullTableCache.RESET
     _id_cache = HasFullTableCache.RESET
 
@@ -10758,6 +10760,14 @@ class ExternalIntegration(Base, HasFullTableCache):
     @password.setter
     def password(self, new_password):
         return self.set_setting(self.PASSWORD, new_password)
+
+    @hybrid_property
+    def authorized_identifier(self):
+        return self.setting(self.AUTHORIZED_IDENTIFIER).value
+
+    @authorized_identifier.setter
+    def authorized_identifier(self, authorized_identifier):
+        return self.set_setting(self.AUTHORIZED_IDENTIFIER, authorized_identifier)
 
     def explain(self, library=None, include_secrets=False):
         """Create a series of human-readable strings to explain an
