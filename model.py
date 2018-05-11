@@ -9102,6 +9102,17 @@ class Representation(Base):
             if not os.path.exists(self.local_path):
                 raise ValueError("%s does not exist." % self.local_path)
             return open(self.local_path)
+        else:
+            url = self.mirror_url or self.url
+            if url:
+                headers = {}
+                if self.media_type:
+                    headers["Accept"] = self.media_type
+                code, response_headers, data = self.simple_http_get(
+                    url, headers
+                )
+                self.content = data
+                return StringIO(self.content)
         return None
 
     def as_image(self):
