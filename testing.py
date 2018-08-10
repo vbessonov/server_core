@@ -883,13 +883,14 @@ class DatabaseTest(object):
             ), short_name="default"
         )
         collection, ignore = get_one_or_create(
-            _db, Collection, name="Default Collection",
+            _db, Collection, name="Default Collection"
         )
         integration = collection.create_external_integration(
-            "NON_EXISTING_PROTOCOL"
+            ExternalIntegration.OPDS_IMPORT
         )
-
         integration.goal = ExternalIntegration.LICENSE_GOAL
+        collection.data_source = "some data source"
+
         if collection not in library.collections:
             library.collections.append(collection)
         return library
