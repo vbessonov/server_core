@@ -19,7 +19,7 @@ from . import (
 from classifier import Classifier
 
 from config import (
-    Configuration, 
+    Configuration,
     temp_config,
 )
 from external_search import DummyExternalSearchIndex
@@ -30,9 +30,9 @@ from model import (
     get_one,
     CachedFeed,
     Collection,
-    Complaint, 
+    Complaint,
     ConfigurationSetting,
-    Contributor, 
+    Contributor,
     CoverageRecord,
     CustomList,
     DataSource,
@@ -43,7 +43,7 @@ from model import (
     Library,
     LicensePool,
     RightsStatus,
-    Timestamp, 
+    Timestamp,
     Work,
 )
 from lane import Lane
@@ -53,7 +53,7 @@ from oneclick import MockOneClickAPI
 from scripts import (
     AddClassificationScript,
     BibliographicRefreshScript,
-    CheckContributorNamesInDB, 
+    CheckContributorNamesInDB,
     CollectionInputScript,
     ConfigureCollectionScript,
     ConfigureIntegrationScript,
@@ -110,7 +110,7 @@ from util.worker_pools import (
 
 class TestScript(DatabaseTest):
 
-    def test_parse_time(self): 
+    def test_parse_time(self):
         reference_date = datetime.datetime(2016, 1, 1)
 
         eq_(Script.parse_time("2016-01-01"), reference_date)
@@ -301,8 +301,8 @@ class DoomedCollectionMonitor(CollectionMonitor):
         self.ran = True
         self.collection.doomed = True
         raise Exception("Doomed!")
-        
-        
+
+
 class TestRunMonitorScript(DatabaseTest):
 
     def test_run_with_collection_monitor(self):
@@ -318,7 +318,7 @@ class TestRunMonitorScript(DatabaseTest):
         script.run()
         for c in [c1, c2]:
             eq_("test value", c.ran_with_argument)
-        
+
 
 class TestRunMultipleMonitorsScript(DatabaseTest):
 
@@ -352,7 +352,7 @@ class TestRunMultipleMonitorsScript(DatabaseTest):
         eq_("Doomed!", m2.exception.message)
         eq_(None, getattr(m1, 'exception', None))
 
-        
+
 class TestRunCollectionMonitorScript(DatabaseTest):
 
 
@@ -395,28 +395,40 @@ class TestPatronInputScript(DatabaseTest):
 
     def test_parse_patron_list(self):
         """Test that patrons can be identified with any unique identifier."""
+        l1 = self._library()
+        l2 = self._library()
         p1 = self._patron()
         p1.authorization_identifier = self._str
+        p1.library_id = l1.id
         p2 = self._patron()
         p2.username = self._str
+        p2.library_id = l1.id
         p3 = self._patron()
         p3.external_identifier = self._str
+        p3.library_id = l1.id
+        p4 = self._patron()
+        p4.external_identifier = self._str
+        p4.library_id = l2.id
         args = [p1.authorization_identifier, 'no-such-patron',
                 '', p2.username, p3.external_identifier]
         patrons = PatronInputScript.parse_patron_list(
-            self._db, args
+            self._db, l1, args
         )
         eq_([p1, p2, p3], patrons)
-
-        eq_([], PatronInputScript.parse_patron_list(self._db, []))
+        eq_([], PatronInputScript.parse_patron_list(self._db, l1, []))
+        eq_([p1], PatronInputScript.parse_patron_list(self._db, l1, [p1.external_identifier, p4.external_identifier]))
+        eq_([p4], PatronInputScript.parse_patron_list(self._db, l2, [p1.external_identifier, p4.external_identifier]))
 
     def test_parse_command_line(self):
+        l1 = self._library()
         p1 = self._patron()
         p2 = self._patron()
         p1.authorization_identifier = self._str
         p2.authorization_identifier = self._str
+        p1.library_id = l1.id
+        p2.library_id = l1.id
         # We pass in one patron identifier on the command line...
-        cmd_args = [p1.authorization_identifier]
+        cmd_args = [l1.short_name, p1.authorization_identifier]
         # ...and another one into standard input.
         stdin = MockStdin(p2.authorization_identifier)
         parsed = PatronInputScript.parse_command_line(
@@ -424,12 +436,21 @@ class TestPatronInputScript(DatabaseTest):
         )
         eq_([p1, p2], parsed.patrons)
 
-    def test_parse_command_line_no_identifiers(self):
-        parsed = PatronInputScript.parse_command_line(
-            self._db, [], MockStdin()
-        )
-        eq_([], parsed.patrons)
-
+    def test_patron_different_library(self):
+        l1 = self._library()
+        l2 = self._library()
+        p1 = self._patron()
+        p2 = self._patron()
+        p1.authorization_identifier = self._str
+        p2.authorization_identifier = p1.authorization_identifier
+        p1.library_id = l1.id
+        p2.library_id = l2.id
+        cmd_args = [l1.short_name, p1.authorization_identifier]
+        parsed = PatronInputScript.parse_command_line(self._db, cmd_args, None)
+        eq_([p1], parsed.patrons)
+        cmd_args = [l2.short_name, p2.authorization_identifier]
+        parsed = PatronInputScript.parse_command_line(self._db, cmd_args, None)
+        eq_([p2], parsed.patrons)
 
     def test_do_run(self):
         """Test that PatronInputScript.do_run() calls process_patron()
@@ -438,13 +459,19 @@ class TestPatronInputScript(DatabaseTest):
         class MockPatronInputScript(PatronInputScript):
             def process_patron(self, patron):
                 patron.processed = True
+        l1 = self._library()
         p1 = self._patron()
         p2 = self._patron()
         p3 = self._patron()
+        p1.library_id = l1.id
+        p2.library_id = l1.id
+        p3.library_id = l1.id
+        p1.processed = False
+        p2.processed = False
         p3.processed = False
         p1.authorization_identifier = self._str
         p2.authorization_identifier = self._str
-        cmd_args = [p1.authorization_identifier]
+        cmd_args = [l1.short_name, p1.authorization_identifier]
         stdin = MockStdin(p2.authorization_identifier)
         script = MockPatronInputScript(self._db)
         script.do_run(cmd_args=cmd_args, stdin=stdin)
@@ -547,7 +574,7 @@ class TestRunCoverageProviderScript(DatabaseTest):
 
     def test_parse_command_line(self):
         identifier = self._identifier()
-        cmd_args = ["--cutoff-time", "2016-05-01", "--identifier-type", 
+        cmd_args = ["--cutoff-time", "2016-05-01", "--identifier-type",
                     identifier.type, identifier.identifier]
         parsed = RunCoverageProviderScript.parse_command_line(
             self._db, cmd_args, MockStdin()
@@ -629,7 +656,7 @@ class TestRunWorkCoverageProviderScript(DatabaseTest):
         assert isinstance(provider, AlwaysSuccessfulWorkCoverageProvider)
         eq_(123, provider.batch_size)
 
-        
+
 class TestWorkProcessingScript(DatabaseTest):
 
     def test_make_query(self):
@@ -638,7 +665,7 @@ class TestWorkProcessingScript(DatabaseTest):
         g2 = self._work(with_license_pool=True, with_open_access_download=True)
 
         overdrive_edition = self._edition(
-            data_source_name=DataSource.OVERDRIVE, 
+            data_source_name=DataSource.OVERDRIVE,
             identifier_type=Identifier.OVERDRIVE_ID,
             with_license_pool=True
         )[0]
@@ -1348,7 +1375,7 @@ class TestAddClassificationScript(DatabaseTest):
         identifier = work.license_pools[0].identifier
         stdin = MockStdin(identifier.identifier)
         eq_(Classifier.AUDIENCE_ADULT, work.audience)
-        
+
         cmd_args = [
             "--identifier-type", identifier.type,
             "--subject-type", Classifier.FREEFORM_AUDIENCE,
@@ -1366,7 +1393,7 @@ class TestAddClassificationScript(DatabaseTest):
         subject = classification.subject
         eq_(Classifier.FREEFORM_AUDIENCE, subject.type)
         eq_(Classifier.AUDIENCE_CHILDREN, subject.identifier)
-        
+
         # The work has been reclassified and is now known as a
         # children's book.
         eq_(Classifier.AUDIENCE_CHILDREN, work.audience)
@@ -1429,7 +1456,7 @@ class TestShowLibrariesScript(DatabaseTest):
         ShowLibrariesScript().do_run(self._db, output=output)
         expect_1 = "\n".join(l1.explain(include_secrets=False))
         expect_2 = "\n".join(l2.explain(include_secrets=False))
-        
+
         eq_(expect_1 + "\n" + expect_2 + "\n", output.getvalue())
 
 
@@ -1441,7 +1468,7 @@ class TestShowLibrariesScript(DatabaseTest):
             output=output
         )
         eq_(expect_2 + "\n", output.getvalue())
-        
+
         # We can tell the script to include the library registry
         # shared secret.
         output = StringIO()
@@ -1517,7 +1544,7 @@ class TestConfigureSiteScript(DatabaseTest):
         assert 'setting_secret' in expect
 
 class TestConfigureLibraryScript(DatabaseTest):
-    
+
     def test_bad_arguments(self):
         script = ConfigureLibraryScript()
         library, ignore = create(
@@ -1580,7 +1607,7 @@ class TestConfigureLibraryScript(DatabaseTest):
 
         eq_("Library 1 New Name", library.name)
         eq_("value", library.setting("customkey").value)
-        
+
         expect_output = "Configuration settings stored.\n" + "\n".join(library.explain()) + "\n"
         eq_(expect_output, output.getvalue())
 
@@ -1606,7 +1633,7 @@ class TestShowCollectionsScript(DatabaseTest):
         ShowCollectionsScript().do_run(self._db, output=output)
         expect_1 = "\n".join(c1.explain(include_secrets=False))
         expect_2 = "\n".join(c2.explain(include_secrets=False))
-        
+
         eq_(expect_1 + "\n" + expect_2 + "\n", output.getvalue())
 
 
@@ -1618,7 +1645,7 @@ class TestShowCollectionsScript(DatabaseTest):
             output=output
         )
         eq_(expect_2 + "\n", output.getvalue())
-        
+
         # We can tell the script to include the collection password
         output = StringIO()
         ShowCollectionsScript().do_run(
@@ -1632,7 +1659,7 @@ class TestShowCollectionsScript(DatabaseTest):
 
 
 class TestConfigureCollectionScript(DatabaseTest):
-    
+
     def test_bad_arguments(self):
         script = ConfigureCollectionScript()
         library, ignore = create(
@@ -1670,7 +1697,7 @@ class TestConfigureCollectionScript(DatabaseTest):
 
 
     def test_success(self):
-        
+
         script = ConfigureCollectionScript()
         l1, ignore = create(
             self._db, Library, name="Library 1", short_name="L1",
@@ -1743,10 +1770,10 @@ class TestConfigureCollectionScript(DatabaseTest):
         # The collection has been changed.
         eq_("foo", collection.external_integration.url)
         eq_(ExternalIntegration.BIBLIOTHECA, collection.protocol)
-        
+
         expect = ("Configuration settings stored.\n"
                   + "\n".join(collection.explain()) + "\n")
-        
+
         eq_(expect, output.getvalue())
 
 
@@ -1777,7 +1804,7 @@ class TestShowIntegrationsScript(DatabaseTest):
         ShowIntegrationsScript().do_run(self._db, output=output)
         expect_1 = "\n".join(i1.explain(include_secrets=False))
         expect_2 = "\n".join(i2.explain(include_secrets=False))
-        
+
         eq_(expect_1 + "\n" + expect_2 + "\n", output.getvalue())
 
 
@@ -1789,7 +1816,7 @@ class TestShowIntegrationsScript(DatabaseTest):
             output=output
         )
         eq_(expect_2 + "\n", output.getvalue())
-        
+
         # We can tell the script to include the integration secrets
         output = StringIO()
         ShowIntegrationsScript().do_run(
@@ -1800,10 +1827,10 @@ class TestShowIntegrationsScript(DatabaseTest):
         expect_1 = "\n".join(i1.explain(include_secrets=True))
         expect_2 = "\n".join(i2.explain(include_secrets=True))
         eq_(expect_1 + "\n" + expect_2 + "\n", output.getvalue())
-        
+
 
 class TestConfigureIntegrationScript(DatabaseTest):
-    
+
     def test_load_integration(self):
         m = ConfigureIntegrationScript._integration
 
@@ -1824,7 +1851,7 @@ class TestConfigureIntegrationScript(DatabaseTest):
             'No integration with name "Unknown integration". To create it, you must also provide protocol and goal.',
             m, self._db, None, "Unknown integration", None, None
         )
-        
+
         integration = self._external_integration(
             protocol="Protocol", goal="Goal"
         )
@@ -1847,7 +1874,7 @@ class TestConfigureIntegrationScript(DatabaseTest):
         eq_("Protocol", integration2.protocol)
         eq_("Goal2", integration2.goal)
         eq_("I exist now", integration2.name)
-        
+
     def test_add_settings(self):
         script = ConfigureIntegrationScript()
         output = StringIO()
@@ -1885,7 +1912,7 @@ class TestShowLanesScript(DatabaseTest):
         ShowLanesScript().do_run(self._db, output=output)
         expect_1 = "\n".join(l1.explain())
         expect_2 = "\n".join(l2.explain())
-        
+
         eq_(expect_1 + "\n\n" + expect_2 + "\n\n", output.getvalue())
 
         # We can tell the script to only list a single lane.
@@ -1898,7 +1925,7 @@ class TestShowLanesScript(DatabaseTest):
         eq_(expect_2 + "\n\n", output.getvalue())
 
 class TestConfigureLaneScript(DatabaseTest):
-    
+
     def test_bad_arguments(self):
         script = ConfigureLaneScript()
 
@@ -1968,7 +1995,7 @@ class TestConfigureLaneScript(DatabaseTest):
         eq_(parent, lane.parent)
         expect = ("Lane settings stored.\n"
                   + "\n".join(lane.explain()) + "\n")
-        
+
         eq_(expect, output.getvalue())
 
 
@@ -2006,14 +2033,14 @@ class TestCollectionInputScript(DatabaseTest):
 class MockOPDSImportMonitor(object):
     """Pretend to monitor an OPDS feed for new titles."""
     INSTANCES = []
-    
+
     def __init__(self, _db, collection, *args, **kwargs):
         self.collection = collection
         self.args = args
         self.kwargs = kwargs
         self.INSTANCES.append(self)
         self.was_run = False
-        
+
     def run(self):
         self.was_run = True
 
@@ -2026,8 +2053,8 @@ class MockOPDSImportScript(OPDSImportScript):
     MONITOR_CLASS = MockOPDSImportMonitor
     IMPORTER_CLASS = MockOPDSImporter
 
-        
-class TestOPDSImportScript(DatabaseTest):  
+
+class TestOPDSImportScript(DatabaseTest):
 
     def test_do_run(self):
         self._default_collection.external_integration.setting(Collection.DATA_SOURCE_NAME_SETTING).value = (
@@ -2171,11 +2198,11 @@ Here's your problem: your works aren't open access and have no licenses owned.
         from model import MaterializedWorkWithGenre as work_model
         mw_query = self._db.query(work_model)
         eq_(0, mw_query.count())
-        
+
         # Let's also add a CachedFeed which might be clogging things up.
         feed = create(self._db, CachedFeed, type=CachedFeed.PAGE_TYPE,
                       pagination="")
-        
+
         # We're using the real script instead of the mock so that we
         # can test the full output of the script in a realistic situation.
         FixInvisibleWorksScript(self._db, output, search=search).do_run()
@@ -2348,7 +2375,7 @@ class TestBibliographicRefreshScript(DatabaseTest):
         # it's covered.
         lp.collection = self._default_collection
         eq_(True, script.refresh_metadata(identifier))
-        
+
         # Unless an error is raised!
         provider = BrokenBibliographicCoverageProvider(self._default_collection)
         script.providers = [provider]
@@ -2402,10 +2429,10 @@ class TestReclassifyWorksForUncheckedSubjectsScript(DatabaseTest):
         with unchecked subjects.
         """
         script = ReclassifyWorksForUncheckedSubjectsScript(self._db)
-        eq_(WorkClassificationScript.policy, 
+        eq_(WorkClassificationScript.policy,
             ReclassifyWorksForUncheckedSubjectsScript.policy)
         eq_(100, script.batch_size)
-        eq_(dump_query(Work.for_unchecked_subjects(self._db)), 
+        eq_(dump_query(Work.for_unchecked_subjects(self._db)),
             dump_query(script.query))
 
 
@@ -2458,7 +2485,7 @@ class TestMirrorResourcesScript(DatabaseTest):
                 for collection in collections:
                     if collection == has_uploader:
                         yield collection, mock_uploader
-                
+
             def process_collection(self, collection, policy):
                 self.processed.append((collection, policy))
 
@@ -2485,7 +2512,7 @@ class TestMirrorResourcesScript(DatabaseTest):
 
     def test_collections_with_uploader(self):
         class Mock(MirrorResourcesScript):
-            
+
             mock_policy = object()
 
             @classmethod
@@ -2720,4 +2747,4 @@ class TestNYTBestSellerListsScript(object):
 class TestRefreshMaterializedViewsScript(object):
     """TODO"""
     pass
-    
+
