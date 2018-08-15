@@ -297,9 +297,9 @@ class ExternalSearchIndex(object):
             size=size,
         )
         if fields is not None:
-            search_args['fields'] = fields
-        # search_args['explain'] = True
-        # print "Args looks like: %r" % search_args
+            search_args['docvalue_fields'] = fields
+        search_args['explain'] = True
+        print "Args looks like: %r" % search_args
         results = self.search(**search_args)
         # print "Results: %r" % results
         return results
@@ -714,7 +714,7 @@ class ExternalSearchIndex(object):
 
 class ExternalSearchIndexVersions(object):
 
-    VERSIONS = ['v2', 'v3']
+    VERSIONS = ['v2', 'v3', 'v4']
 
     @classmethod
     def latest(cls):
@@ -734,6 +734,63 @@ class ExternalSearchIndexVersions(object):
         for field in fields:
             mapping["properties"][field] = field_description
         return mapping
+
+    @classmethod
+    def v4_body(cls):
+        """The v4 body is the same as the v3 except the 'string' type
+        is now the 'text' type.
+        """
+        settings = {
+            "analysis": {
+                "filter": {
+                    "en_stop_filter": {
+                        "type": "stop",
+                        "stopwords": ["_english_"]
+                    },
+                    "en_stem_filter": {
+                        "type": "stemmer",
+                        "name": "english"
+                    },
+                    "en_stem_minimal_filter": {
+                        "type": "stemmer",
+                        "name": "english"
+                    },
+                },
+                "analyzer" : {
+                    "en_analyzer": {
+                        "type": "custom",
+                        "char_filter": ["html_strip"],
+                        "tokenizer": "standard",
+                        "filter": ["lowercase", "asciifolding", "en_stop_filter", "en_stem_filter"]
+                    },
+                    "en_minimal_analyzer": {
+                        "type": "custom",
+                        "char_filter": ["html_strip"],
+                        "tokenizer": "standard",
+                        "filter": ["lowercase", "asciifolding", "en_stop_filter", "en_stem_minimal_filter"]
+                    },
+                }
+            }
+        }
+
+        mapping = cls.map_fields(
+            fields=["title", "series", "subtitle", "summary", "classifications.term"],
+            field_description={
+                "type": "text",
+                "analyzer": "en_analyzer",
+                "fields": {
+                    "minimal": {
+                        "type": "text",
+                        "analyzer": "en_minimal_analyzer"},
+                    "standard": {
+                        "type": "text",
+                        "analyzer": "standard"
+                    }
+                }}
+        )
+        mappings = { ExternalSearchIndex.work_document_type : mapping }
+
+        return dict(settings=settings, mappings=mappings)
 
     @classmethod
     def v3_body(cls):
