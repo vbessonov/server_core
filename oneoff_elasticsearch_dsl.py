@@ -246,7 +246,7 @@ class ExternalSearchIndex(object):
     def _match(self, field, query_string):
         """A clause that matches the query string against a specific field in the search document.
         """
-        return Q("match", **{field: query_string})
+        return Q("match", minimum_should_match=3, **{field: query_string})
 
     def minimal_stemming_search(self, query_string, fields):
         return [self._match_phrase(field, query_string) for field in fields]
@@ -411,6 +411,8 @@ class ExternalSearchIndex(object):
             f = f & F('term', audience=self.audiences)
         return f
 
+qa = "https://search-qa-nypl-circ-ob3hfe2f7sicuhearikkuvmejm.us-east-1.es.amazonaws.com/"
+# prod = "http://search-prod-simplfied-3lf56oxhbjcp63fwractcqxohi.us-east-1.es.amazonaws.com:80/"
 url = qa
 index = "circulation-works-current"
 search = ExternalSearchIndex(url, index)
