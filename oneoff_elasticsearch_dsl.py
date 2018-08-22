@@ -251,6 +251,25 @@ class ExternalSearchIndex(object):
     def minimal_stemming_search(self, query_string, fields):
         return [self._match_phrase(field, query_string) for field in fields]
 
+    def make_target_age_query(self, target_age):
+        (lower, upper) = target_age[0], target_age[1]
+        return {
+            "bool" : {
+                # There must be some overlap with the range in the query
+                "must": [
+                    {"range": {"target_age.upper": {"gte": lower}}},
+                    {"range": {"target_age.lower": {"lte": upper}}},
+                ],
+                # Results with ranges closer to the query are better
+                # e.g. for query 4-6, a result with 5-6 beats 6-7
+                "should": [
+                    {"range": {"target_age.upper": {"lte": upper}}},
+                    {"range": {"target_age.lower": {"gte": lower}}},
+                ],
+                "boost": 40
+            }
+        }
+
     def _query_with_field_matches(self, query_string):
         """Deal with a query string that contains information that should be
         exactly matched against a controlled vocabulary
@@ -306,7 +325,7 @@ class ExternalSearchIndex(object):
             if not query:
                 # This is not a relevant part of the query string.
                 return query_string
-            match_query = make_target_age_query(query)
+            match_query = self.make_target_age_query(query)
             match_queries.append(match_query)
             return without_match(query_string, matched_portion)
 
@@ -423,7 +442,7 @@ else:
     query = 'web development software (non-microsoft)'
 query_obj = search.search(query)
 
-for result in query_obj[0:50]:
+for result in query_obj[0:200]:
     print '"%s" (%s) by %s %s %s' % (result['title'], result['subtitle'], result['author'], result['series'], query.lower() in (result.summary or '').lower()) 
     #if not query.lower() in (result['summary'] or '').lower():
     #    print result['summary']
