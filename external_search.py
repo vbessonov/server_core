@@ -302,6 +302,10 @@ class ExternalSearchIndex(object):
             from_=offset,
             size=size,
         )
+        print "Body!"
+        import pprint
+        pprint.pprint(body)
+        print "End!"
         if fields is not None:
             search_args['fields'] = fields
         # search_args['explain'] = True
@@ -404,21 +408,15 @@ class ExternalSearchIndex(object):
         # fuzzy query.
         fuzzy_blacklist = [
             "baseball", "basketball", # These fuzzy match each other
-
             "soccer", # Fuzzy matches "saucer", "docker", "sorcery"
-
             "football", "softball", "software", "postwar",
-
             "hamlet", "harlem", "amulet", "tablet",
 
             "biology", "ecology", "zoology", "geology",
-
             "joke", "jokes" # "jake"
-
             "cat", "cats",
             "car", "cars",
             "war", "wars",
-
             "away", "stay",
         ]
         fuzzy_blacklist_re = re.compile(r'\b(%s)\b' % "|".join(fuzzy_blacklist), re.I)
