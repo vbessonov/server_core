@@ -97,7 +97,7 @@ class ExternalSearchIndex(object):
         # This search query will test a number of hypotheses about what
         # the query string might 'really' mean.
         hypotheses = []
-        def hypothesize(query, boost=20):
+        def hypothesize(query, boost=15):
             if boost > 1:
                 query = self._boost(boost, query)
             hypotheses.append(query)
@@ -452,7 +452,7 @@ for result in query_obj[0:2000]:
         good = "CCC"
 
 
-    out = '%s "%s" (%s) by %s %s %s' % (good, result['title'], result['subtitle'], result['author'], result['series'], query.lower() in (result.summary or '').lower())
+    out = '%3d %s "%s" (%s) by %s %s %s' % (a, good, result['title'], result['subtitle'], result['author'], result['series'], query.lower() in (result.summary or '').lower())
     print out.encode("utf8")
     a += 1
     #if not query.lower() in (result['summary'] or '').lower():
