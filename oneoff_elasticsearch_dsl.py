@@ -252,7 +252,8 @@ class Query(object):
     def minimal_stemming_search(self, query_string, fields):
         return [self._match_phrase(field, query_string) for field in fields]
 
-    def _match_range(self, field, operation, value):
+    def _match_op(self, field, operation, value):
+        """Match an operation on a field other than equality."""
         match = {field : {operation: value}}
         return dict(range=match)
 
@@ -260,17 +261,16 @@ class Query(object):
         (lower, upper) = target_age[0], target_age[1]
         # There must be _some_ overlap with the provided range.
         must = [
-            self._match_range("target_age.upper", "gte", lower),
-            self._match_range("target_age.lower", "lte", upper)
+            self._match_op("target_age.upper", "gte", lower),
+            self._match_op("target_age.lower", "lte", upper)
         ]
 
         # Results with ranges closer to the query are better
         # e.g. for query 4-6, a result with 5-6 beats 6-7
         should = [
-            self._match_range("target_age.upper", "lte", upper),
-            self._match_range("target_age.lower", "gte", lower),
+            self._match_op("target_age.upper", "lte", upper),
+            self._match_op("target_age.lower", "gte", lower),
         ]
-
         return Q("bool", must=must, should=should, boost=boost)
 
     def _query_with_field_matches(self, query_string):
