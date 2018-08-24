@@ -97,7 +97,7 @@ class ExternalSearchIndex(object):
         # This search query will test a number of hypotheses about what
         # the query string might 'really' mean.
         hypotheses = []
-        def hypothesize(query, boost=1):
+        def hypothesize(query, boost=20):
             if boost > 1:
                 query = self._boost(boost, query)
             hypotheses.append(query)
@@ -129,7 +129,7 @@ class ExternalSearchIndex(object):
         # standard searchable fields.
         fuzzy = self.fuzzy_string_query(query_string)
         if fuzzy:
-            hypothesize(fuzzy)
+            hypothesize(fuzzy, 1)
 
         # The query string might contain some specific field matches
         # (e.g. a genre name or target age), with the remainder being
@@ -230,7 +230,6 @@ class ExternalSearchIndex(object):
             "multi_match", fields=self.FUZZY_QUERY_STRING_FIELDS,
             type="best_fields", fuzziness="AUTO",
             query=query_string,
-            max_expansions=2,
             prefix_length=1,
         )
         return fuzzy
@@ -442,8 +441,21 @@ else:
     query = 'web development software (non-microsoft)'
 query_obj = search.search(query)
 
-for result in query_obj[0:200]:
-    print '"%s" (%s) by %s %s %s' % (result['title'], result['subtitle'], result['author'], result['series'], query.lower() in (result.summary or '').lower()) 
+a = 0
+for result in query_obj[0:2000]:
+    good = "FFF"
+    if query.lower() in result.title.lower() or query.lower() in (result.subtitle or "").lower():
+        good = "AAA"
+    elif query.lower() in (result.summary or "").lower():
+        good = "BBB"
+    elif result['genres'] and 'Computers' in [x['name'] for x in result['genres']]:
+        good = "CCC"
+
+
+    out = '%s "%s" (%s) by %s %s %s' % (good, result['title'], result['subtitle'], result['author'], result['series'], query.lower() in (result.summary or '').lower())
+    print out.encode("utf8")
+    a += 1
     #if not query.lower() in (result['summary'] or '').lower():
     #    print result['summary']
     #print result['title'], result['author'], result['medium'], result['series']
+print "%d total" % a
