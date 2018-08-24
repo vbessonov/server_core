@@ -62,12 +62,11 @@ baseline = baseline = {'query': {'filtered': {'filter': {'and': [{'or': [{'terms
                                                                                                       'query': u'mary shelley '}}]}}]}}}}}
 
 
-class ExternalSearchIndex(object):
+class Query(object):
 
-    def __init__(self, url, index, medium='Book', language='eng',
-                 fiction=None, audience=None):
-        self.client = Elasticsearch(url, use_ssl=False, timeout=20, maxsize=25)
-        self.qu = Search(using=self.client)
+    def __init__(self, searcher, medium='Book', language='eng', fiction=None, audience=None,
+                 target_age=None):
+        self.searcher = searcher
         if medium:
             self.media = [medium.lower()]
         else:
@@ -79,6 +78,9 @@ class ExternalSearchIndex(object):
         else:
             self.audiences = None
 
+        if target_age:
+            self.target_age = target_age
+
     def search(self, query_string):
         # Build the query.
         query = self.build_query(query_string)
@@ -89,7 +91,7 @@ class ExternalSearchIndex(object):
             query = Q("filtered", query=query, filter=self.filter())
 
         # Run the query.
-        results = self.qu.query(query)
+        results = self.searcher.query(query)
         print pprint.pprint(results.to_dict())
         return results
 
@@ -250,24 +252,26 @@ class ExternalSearchIndex(object):
     def minimal_stemming_search(self, query_string, fields):
         return [self._match_phrase(field, query_string) for field in fields]
 
-    def make_target_age_query(self, target_age):
+    def _match_range(self, field, operation, value):
+        match = {field : {operation: value}}
+        return dict(range=match)
+
+    def make_target_age_query(self, target_age, boost=1):
         (lower, upper) = target_age[0], target_age[1]
-        return {
-            "bool" : {
-                # There must be some overlap with the range in the query
-                "must": [
-                    {"range": {"target_age.upper": {"gte": lower}}},
-                    {"range": {"target_age.lower": {"lte": upper}}},
-                ],
-                # Results with ranges closer to the query are better
-                # e.g. for query 4-6, a result with 5-6 beats 6-7
-                "should": [
-                    {"range": {"target_age.upper": {"lte": upper}}},
-                    {"range": {"target_age.lower": {"gte": lower}}},
-                ],
-                "boost": 40
-            }
-        }
+        # There must be _some_ overlap with the provided range.
+        must = [
+            self._match_range("target_age.upper", "gte", lower),
+            self._match_range("target_age.lower", "lte", upper)
+        ]
+
+        # Results with ranges closer to the query are better
+        # e.g. for query 4-6, a result with 5-6 beats 6-7
+        should = [
+            self._match_range("target_age.upper", "lte", upper),
+            self._match_range("target_age.lower", "gte", lower),
+        ]
+
+        return Q("bool", must=must, should=should, boost=boost)
 
     def _query_with_field_matches(self, query_string):
         """Deal with a query string that contains information that should be
@@ -324,7 +328,7 @@ class ExternalSearchIndex(object):
             if not query:
                 # This is not a relevant part of the query string.
                 return query_string
-            match_query = self.make_target_age_query(query)
+            match_query = self.make_target_age_query(query, 40)
             match_queries.append(match_query)
             return without_match(query_string, matched_portion)
 
@@ -433,16 +437,19 @@ qa = "https://search-qa-nypl-circ-ob3hfe2f7sicuhearikkuvmejm.us-east-1.es.amazon
 # prod = "http://search-prod-simplfied-3lf56oxhbjcp63fwractcqxohi.us-east-1.es.amazonaws.com:80/"
 url = qa
 index = "circulation-works-current"
-search = ExternalSearchIndex(url, index)
+
+client = Elasticsearch(url, use_ssl=False, timeout=20, maxsize=1000)
+search = Search(using=client)
+query_obj = Query(search)
 import sys
 if len(sys.argv) > 1:
     query = sys.argv[1]
 else:
     query = 'web development software (non-microsoft)'
-query_obj = search.search(query)
+results = query_obj.search(query)
 
 a = 0
-for result in query_obj[0:2000]:
+for result in results[0:2000]:
     good = "FFF"
     if query.lower() in result.title.lower() or query.lower() in (result.subtitle or "").lower():
         good = "AAA"
