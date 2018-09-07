@@ -15,39 +15,9 @@ from config import Configuration
 from lane import (
     Lane,
 )
-from model import (
-    Base,
-    Classification,
-    IntegrationClient,
-    Collection,
-    Complaint,
-    ConfigurationSetting,
-    Contributor,
-    CoverageRecord,
-    Credential,
-    CustomList,
-    DataSource,
-    DeliveryMechanism,
-    DelegatedPatronIdentifier,
-    Edition,
-    ExternalIntegration,
-    Genre,
-    Hyperlink,
-    Identifier,
-    Library,
-    LicensePool,
-    LicensePoolDeliveryMechanism,
-    Patron,
-    PresentationCalculationPolicy,
-    Representation,
-    Resource,
-    RightsStatus,
-    SessionManager,
-    Subject,
-    Work,
-    WorkCoverageRecord,
-    get_one_or_create,
-)
+import core.model
+from core.model import *
+
 from classifier import Classifier
 from coverage import (
     BibliographicCoverageProvider,

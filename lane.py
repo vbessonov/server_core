@@ -49,28 +49,8 @@ from entrypoint import (
     EntryPoint,
     EverythingEntryPoint,
 )
-from model import (
-    directly_modified,
-    get_one_or_create,
-    numericrange_to_tuple,
-    site_configuration_has_changed,
-    tuple_to_numericrange,
-    Base,
-    CachedFeed,
-    CustomList,
-    CustomListEntry,
-    DataSource,
-    DeliveryMechanism,
-    Edition,
-    Genre,
-    get_one,
-    Library,
-    LicensePool,
-    LicensePoolDeliveryMechanism,
-    Session,
-    Work,
-    WorkGenre,
-)
+import core.model
+from core.model import *
 from facets import FacetConstants
 from problem_details import *
 from util import (
