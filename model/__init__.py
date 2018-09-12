@@ -383,6 +383,161 @@ def create(db, model, create_method='',
     flush(db)
     return created, True
 
+class MediaTypeConstants(object):
+
+    EPUB_MEDIA_TYPE = u"application/epub+zip"
+    PDF_MEDIA_TYPE = u"application/pdf"
+    MOBI_MEDIA_TYPE = u"application/x-mobipocket-ebook"
+    AMAZON_KF8_MEDIA_TYPE = u"application/x-mobi8-ebook"
+    TEXT_XML_MEDIA_TYPE = u"text/xml"
+    TEXT_HTML_MEDIA_TYPE = u"text/html"
+    APPLICATION_XML_MEDIA_TYPE = u"application/xml"
+    JPEG_MEDIA_TYPE = u"image/jpeg"
+    PNG_MEDIA_TYPE = u"image/png"
+    GIF_MEDIA_TYPE = u"image/gif"
+    SVG_MEDIA_TYPE = u"image/svg+xml"
+    MP3_MEDIA_TYPE = u"audio/mpeg"
+    MP4_MEDIA_TYPE = u"video/mp4"
+    WMV_MEDIA_TYPE = u"video/x-ms-wmv"
+    SCORM_MEDIA_TYPE = u"application/vnd.librarysimplified.scorm+zip"
+    ZIP_MEDIA_TYPE = u"application/zip"
+    OCTET_STREAM_MEDIA_TYPE = u"application/octet-stream"
+    TEXT_PLAIN = u"text/plain"
+    AUDIOBOOK_MANIFEST_MEDIA_TYPE = u"application/audiobook+json"
+
+    BOOK_MEDIA_TYPES = [
+        EPUB_MEDIA_TYPE,
+        PDF_MEDIA_TYPE,
+        MOBI_MEDIA_TYPE,
+        MP3_MEDIA_TYPE,
+        AMAZON_KF8_MEDIA_TYPE,
+    ]
+
+    # These media types are in the order we would prefer to use them.
+    # e.g. all else being equal, we would prefer a PNG to a JPEG.
+    IMAGE_MEDIA_TYPES = [
+        PNG_MEDIA_TYPE,
+        JPEG_MEDIA_TYPE,
+        GIF_MEDIA_TYPE,
+        SVG_MEDIA_TYPE,
+    ]
+
+    SUPPORTED_BOOK_MEDIA_TYPES = [
+        EPUB_MEDIA_TYPE
+    ]
+
+    # Most of the time, if you believe a resource to be media type A,
+    # but then you make a request and get media type B, then the
+    # actual media type (B) takes precedence over what you thought it
+    # was (A). These media types are the exceptions: they are so
+    # generic that they don't tell you anything, so it's more useful
+    # to stick with A.
+    GENERIC_MEDIA_TYPES = [OCTET_STREAM_MEDIA_TYPE]
+
+    FILE_EXTENSIONS = {
+        EPUB_MEDIA_TYPE: "epub",
+        MOBI_MEDIA_TYPE: "mobi",
+        PDF_MEDIA_TYPE: "pdf",
+        MP3_MEDIA_TYPE: "mp3",
+        MP4_MEDIA_TYPE: "mp4",
+        WMV_MEDIA_TYPE: "wmv",
+        JPEG_MEDIA_TYPE: "jpg",
+        PNG_MEDIA_TYPE: "png",
+        SVG_MEDIA_TYPE: "svg",
+        GIF_MEDIA_TYPE: "gif",
+        ZIP_MEDIA_TYPE: "zip",
+        TEXT_PLAIN: "txt",
+        TEXT_HTML_MEDIA_TYPE: "html",
+        APPLICATION_XML_MEDIA_TYPE: "xml",
+        AUDIOBOOK_MANIFEST_MEDIA_TYPE: "audiobook-manifest",
+        SCORM_MEDIA_TYPE: "zip"
+    }
+
+    COMMON_EBOOK_EXTENSIONS = ['.epub', '.pdf']
+    COMMON_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif']
+
+    # Invert FILE_EXTENSIONS and add some extra guesses.
+    MEDIA_TYPE_FOR_EXTENSION = {
+        ".htm" : TEXT_HTML_MEDIA_TYPE,
+        ".jpeg" : JPEG_MEDIA_TYPE,
+    }
+    for media_type, extension in FILE_EXTENSIONS.items():
+        MEDIA_TYPE_FOR_EXTENSION['.' + extension] = media_type
+
+class DataSourceConstants(object):
+    GUTENBERG = u"Gutenberg"
+    OVERDRIVE = u"Overdrive"
+    ODILO = u"Odilo"
+    PROJECT_GITENBERG = u"Project GITenberg"
+    STANDARD_EBOOKS = u"Standard Ebooks"
+    UNGLUE_IT = u"unglue.it"
+    BIBLIOTHECA = u"Bibliotheca"
+    OCLC = u"OCLC Classify"
+    OCLC_LINKED_DATA = u"OCLC Linked Data"
+    AMAZON = u"Amazon"
+    XID = u"WorldCat xID"
+    AXIS_360 = u"Axis 360"
+    WEB = u"Web"
+    OPEN_LIBRARY = u"Open Library"
+    CONTENT_CAFE = u"Content Cafe"
+    VIAF = u"VIAF"
+    GUTENBERG_COVER_GENERATOR = u"Gutenberg Illustrated"
+    GUTENBERG_EPUB_GENERATOR = u"Project Gutenberg EPUB Generator"
+    METADATA_WRANGLER = u"Library Simplified metadata wrangler"
+    MANUAL = u"Manual intervention"
+    NOVELIST = u"NoveList Select"
+    NYT = u"New York Times"
+    NYPL_SHADOWCAT = u"NYPL Shadowcat"
+    LIBRARY_STAFF = u"Library staff"
+    ADOBE = u"Adobe DRM"
+    PLYMPTON = u"Plympton"
+    RB_DIGITAL = u"RBdigital"
+    ELIB = u"eLiburutegia"
+    OA_CONTENT_SERVER = u"Library Simplified Open Access Content Server"
+    PRESENTATION_EDITION = u"Presentation edition generator"
+    INTERNAL_PROCESSING = u"Library Simplified Internal Process"
+    FEEDBOOKS = u"FeedBooks"
+    BIBBLIO = u"Bibblio"
+    ENKI = u"Enki"
+
+    DEPRECATED_NAMES = {
+        u"3M" : BIBLIOTHECA,
+        u"OneClick" : RB_DIGITAL,
+    }
+    THREEM = BIBLIOTHECA
+    ONECLICK = RB_DIGITAL
+
+    # Some sources of open-access ebooks are better than others. This
+    # list shows which sources we prefer, in ascending order of
+    # priority. unglue.it is lowest priority because it tends to
+    # aggregate books from other sources. We prefer books from their
+    # original sources.
+    OPEN_ACCESS_SOURCE_PRIORITY = [
+        UNGLUE_IT,
+        GUTENBERG,
+        GUTENBERG_EPUB_GENERATOR,
+        PROJECT_GITENBERG,
+        ELIB,
+        FEEDBOOKS,
+        PLYMPTON,
+        STANDARD_EBOOKS,
+    ]
+
+    # When we're generating the presentation edition for a
+    # LicensePool, editions are processed based on their data source,
+    # in the following order:
+    #
+    # [all other sources] < [source of the license pool] < [metadata
+    # wrangler] < [library staff] < [manual intervention]
+    #
+    # This list keeps track of the high-priority portion of that
+    # ordering.
+    #
+    # "LIBRARY_STAFF" comes from the Admin Interface.
+    # "MANUAL" is not currently used, but will give the option of putting in
+    # software engineer-created system overrides.
+    PRESENTATION_EDITION_PRIORITY = [METADATA_WRANGLER, LIBRARY_STAFF, MANUAL]
+
 Base = declarative_base()
 
 from bibliographic_metadata import (
@@ -411,6 +566,9 @@ from classification import (
     Classification,
     Subject,
     Genre,
+)
+from collection import (
+    Collection,
 )
 from configuration import (
     ExternalIntegration,
@@ -463,7 +621,6 @@ from works import (
     PresentationCalculationPolicy,
     SessionManager,
 )
-
 # Most of the time, we can know whether a change to the database is
 # likely to require that the application reload the portion of the
 # configuration it gets from the database. These hooks will call
@@ -564,6 +721,7 @@ def refresh_datasource_cache(mapper, connection, target):
 @event.listens_for(Library, 'after_insert')
 @event.listens_for(Library, 'after_delete')
 @event.listens_for(Library, 'after_update')
+
 def refresh_library_cache(mapper, connection, target):
     # The next time someone tries to access a library,
     # the cache will be repopulated.
@@ -572,6 +730,7 @@ def refresh_library_cache(mapper, connection, target):
 @event.listens_for(Genre, 'after_insert')
 @event.listens_for(Genre, 'after_delete')
 @event.listens_for(Genre, 'after_update')
+
 def refresh_genre_cache(mapper, connection, target):
     # The next time someone tries to access a genre,
     # the cache will be repopulated.
@@ -579,3 +738,32 @@ def refresh_genre_cache(mapper, connection, target):
     # The only time this should really happen is the very first time a
     # site is brought up, but just in case.
     Genre.reset_cache()
+
+@event.listens_for(LicensePool.work_id, 'set')
+@event.listens_for(Work.presentation_edition_id, 'set')
+# When a pool gets a work and a presentation edition for the first time,
+# the work should be added to any custom lists associated with the pool's
+# collection.
+# In some cases, the work may be generated before the presentation edition.
+# Then we need to add it when the work gets a presentation edition.
+def add_work_to_customlists_for_collection(pool_or_work, value, oldvalue, initiator):
+    if isinstance(pool_or_work, LicensePool):
+        work = pool_or_work.work
+        pools = [pool_or_work]
+    else:
+        work = pool_or_work
+        pools = work.license_pools
+
+    if (not oldvalue or oldvalue is NO_VALUE) and value and work and work.presentation_edition:
+        for pool in pools:
+            if not pool.collection:
+                # This shouldn't happen, but don't crash if it does --
+                # the correct behavior is that the work not be added to
+                # any CustomLists.
+                continue
+            for list in pool.collection.customlists:
+                # Since the work was just created, we can assume that
+                # there's already a pending registration for updating the
+                # work's internal index, and decide not to create a
+                # second one.
+                list.add_entry(work, featured=True, update_external_index=False)

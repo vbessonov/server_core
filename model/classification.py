@@ -346,9 +346,9 @@ class Classification(Base):
     @property
     def scaled_weight(self):
         weight = self.weight
-        if self.data_source.name == DataSource.OCLC_LINKED_DATA:
+        if self.data_source.name == DataSourceConstants.OCLC_LINKED_DATA:
             weight = weight / 10.0
-        elif self.data_source.name == DataSource.OVERDRIVE:
+        elif self.data_source.name == DataSourceConstants.OVERDRIVE:
             weight = weight * 50
         return weight
 
@@ -379,21 +379,21 @@ class Classification(Base):
         # information about target age, so being careful about how
         # much we trust different data sources can become important.
 
-        DataSource.MANUAL : 1.0,
-        DataSource.LIBRARY_STAFF: 1.0,
-        (DataSource.METADATA_WRANGLER, Subject.AGE_RANGE) : 1.0,
+        DataSourceConstants.MANUAL : 1.0,
+        DataSourceConstants.LIBRARY_STAFF: 1.0,
+        (DataSourceConstants.METADATA_WRANGLER, Subject.AGE_RANGE) : 1.0,
 
         Subject.AXIS_360_AUDIENCE : 0.9,
-        (DataSource.OVERDRIVE, Subject.INTEREST_LEVEL) : 0.9,
-        (DataSource.OVERDRIVE, Subject.OVERDRIVE) : 0.9, # But see below
-        (DataSource.AMAZON, Subject.AGE_RANGE) : 0.85,
-        (DataSource.AMAZON, Subject.GRADE_LEVEL) : 0.85,
+        (DataSourceConstants.OVERDRIVE, Subject.INTEREST_LEVEL) : 0.9,
+        (DataSourceConstants.OVERDRIVE, Subject.OVERDRIVE) : 0.9, # But see below
+        (DataSourceConstants.AMAZON, Subject.AGE_RANGE) : 0.85,
+        (DataSourceConstants.AMAZON, Subject.GRADE_LEVEL) : 0.85,
 
         # Although Overdrive usually reserves Fiction and Nonfiction
         # for books for adults, it's not as reliable an indicator as
         # other Overdrive classifications.
-        (DataSource.OVERDRIVE, Subject.OVERDRIVE, "Fiction") : 0.7,
-        (DataSource.OVERDRIVE, Subject.OVERDRIVE, "Nonfiction") : 0.7,
+        (DataSourceConstants.OVERDRIVE, Subject.OVERDRIVE, "Fiction") : 0.7,
+        (DataSourceConstants.OVERDRIVE, Subject.OVERDRIVE, "Nonfiction") : 0.7,
 
         Subject.AGE_RANGE : 0.6,
         Subject.GRADE_LEVEL : 0.6,
@@ -405,14 +405,14 @@ class Classification(Base):
 
         # Tags that come from OCLC Linked Data are of lower quality
         # because they sometimes talk about completely the wrong book.
-        (DataSource.OCLC_LINKED_DATA, Subject.TAG) : 0.3,
+        (DataSourceConstants.OCLC_LINKED_DATA, Subject.TAG) : 0.3,
 
         # These measure reading level, not age appropriateness.
         # However, if the book is a remedial work for adults we won't
         # be calculating a target age in the first place, so it's okay
         # to use reading level as a proxy for age appropriateness in a
         # pinch. (But not outside of a pinch.)
-        (DataSource.OVERDRIVE, Subject.GRADE_LEVEL) : 0.35,
+        (DataSourceConstants.OVERDRIVE, Subject.GRADE_LEVEL) : 0.35,
         Subject.LEXILE_SCORE : 0.1,
         Subject.ATOS_SCORE: 0.1,
     }

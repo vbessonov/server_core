@@ -139,16 +139,16 @@ class ExternalIntegration(Base, HasFullTableCache):
 
     # Supported protocols for ExternalIntegrations with LICENSE_GOAL.
     OPDS_IMPORT = u'OPDS Import'
-    OVERDRIVE = DataSource.OVERDRIVE
-    ODILO = DataSource.ODILO
-    BIBLIOTHECA = DataSource.BIBLIOTHECA
-    AXIS_360 = DataSource.AXIS_360
-    RB_DIGITAL = DataSource.RB_DIGITAL
+    OVERDRIVE = DataSourceConstants.OVERDRIVE
+    ODILO = DataSourceConstants.ODILO
+    BIBLIOTHECA = DataSourceConstants.BIBLIOTHECA
+    AXIS_360 = DataSourceConstants.AXIS_360
+    RB_DIGITAL = DataSourceConstants.RB_DIGITAL
     ONE_CLICK = RB_DIGITAL
     OPDS_FOR_DISTRIBUTORS = u'OPDS for Distributors'
-    ENKI = DataSource.ENKI
-    FEEDBOOKS = DataSource.FEEDBOOKS
-    MANUAL = DataSource.MANUAL
+    ENKI = DataSourceConstants.ENKI
+    FEEDBOOKS = DataSourceConstants.FEEDBOOKS
+    MANUAL = DataSourceConstants.MANUAL
 
     # These protocols were used on the Content Server when mirroring
     # content from a given directory or directly from Project
@@ -156,7 +156,7 @@ class ExternalIntegration(Base, HasFullTableCache):
     # MANUAL.  GUTENBERG has yet to be replaced, but will eventually
     # be moved into LICENSE_PROTOCOLS.
     DIRECTORY_IMPORT = "Directory Import"
-    GUTENBERG = DataSource.GUTENBERG
+    GUTENBERG = DataSourceConstants.GUTENBERG
 
     LICENSE_PROTOCOLS = [
         OPDS_IMPORT, OVERDRIVE, ODILO, BIBLIOTHECA, AXIS_360, RB_DIGITAL,
@@ -166,13 +166,13 @@ class ExternalIntegration(Base, HasFullTableCache):
     # Some integrations with LICENSE_GOAL imply that the data and
     # licenses come from a specific data source.
     DATA_SOURCE_FOR_LICENSE_PROTOCOL = {
-        OVERDRIVE : DataSource.OVERDRIVE,
-        ODILO : DataSource.ODILO,
-        BIBLIOTHECA : DataSource.BIBLIOTHECA,
-        AXIS_360 : DataSource.AXIS_360,
-        RB_DIGITAL : DataSource.RB_DIGITAL,
-        ENKI : DataSource.ENKI,
-        FEEDBOOKS : DataSource.FEEDBOOKS,
+        OVERDRIVE : DataSourceConstants.OVERDRIVE,
+        ODILO : DataSourceConstants.ODILO,
+        BIBLIOTHECA : DataSourceConstants.BIBLIOTHECA,
+        AXIS_360 : DataSourceConstants.AXIS_360,
+        RB_DIGITAL : DataSourceConstants.RB_DIGITAL,
+        ENKI : DataSourceConstants.ENKI,
+        FEEDBOOKS : DataSourceConstants.FEEDBOOKS,
     }
 
     # Integrations with METADATA_GOAL

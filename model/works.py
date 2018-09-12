@@ -99,14 +99,14 @@ class Work(Base):
     # data source, each work is assigned the minimum level of quality
     # necessary to show up in featured feeds.
     default_quality_by_data_source = {
-        DataSource.GUTENBERG: 0,
-        DataSource.RB_DIGITAL: 0.4,
-        DataSource.OVERDRIVE: 0.4,
-        DataSource.BIBLIOTHECA : 0.65,
-        DataSource.AXIS_360: 0.65,
-        DataSource.STANDARD_EBOOKS: 0.8,
-        DataSource.UNGLUE_IT: 0.4,
-        DataSource.PLYMPTON: 0.5,
+        DataSourceConstants.GUTENBERG: 0,
+        DataSourceConstants.RB_DIGITAL: 0.4,
+        DataSourceConstants.OVERDRIVE: 0.4,
+        DataSourceConstants.BIBLIOTHECA : 0.65,
+        DataSourceConstants.AXIS_360: 0.65,
+        DataSourceConstants.STANDARD_EBOOKS: 0.8,
+        DataSourceConstants.UNGLUE_IT: 0.4,
+        DataSourceConstants.PLYMPTON: 0.5,
     }
 
     __tablename__ = 'works'
@@ -857,7 +857,7 @@ class Work(Base):
             # Descriptions from Gutenberg are useless, so we
             # specifically exclude it from being a privileged data
             # source.
-            if pool.data_source.name != DataSource.GUTENBERG:
+            if pool.data_source.name != DataSourceConstants.GUTENBERG:
                 licensed_data_sources.add(pool.data_source)
 
         if policy.classify or policy.choose_summary or policy.calculate_quality:
@@ -878,7 +878,7 @@ class Work(Base):
             )
 
         if policy.choose_summary:
-            staff_data_source = DataSource.lookup(_db, DataSource.LIBRARY_STAFF)
+            staff_data_source = DataSourceConstants.lookup(_db, DataSourceConstants.LIBRARY_STAFF)
             summary, summaries = Identifier.evaluate_summary_quality(
                 _db, identifier_ids, [staff_data_source, licensed_data_sources]
             )
@@ -1736,7 +1736,7 @@ class SessionManager(object):
     @classmethod
     def initialize_data(cls, session, set_site_configuration=True):
         # Create initial data sources.
-        list(DataSource.well_known_sources(session))
+        list(DataSourceConstants.well_known_sources(session))
 
         # Load all existing Genre objects.
         Genre.populate_cache(session)

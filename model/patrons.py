@@ -1,4 +1,5 @@
 # encoding: utf-8
+from . import *
 from nose.tools import set_trace
 import datetime
 import uuid
@@ -26,6 +27,28 @@ from sqlalchemy.orm.session import Session
 
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
+
+class LoanAndHoldMixin(object):
+
+    @property
+    def work(self):
+        """Try to find the corresponding work for this Loan/Hold."""
+        license_pool = self.license_pool
+        if not license_pool:
+            return None
+        if license_pool.work:
+            return license_pool.work
+        if license_pool.presentation_edition and license_pool.presentation_edition.work:
+            return license_pool.presentation_edition.work
+        return None
+
+    @property
+    def library(self):
+        """Try to find the corresponding library for this Loan/Hold."""
+        if self.patron:
+            return self.patron.library
+        # If this Loan/Hold belongs to a external patron, there may be no library.
+        return None
 
 class Patron(Base):
 
@@ -421,26 +444,3 @@ class PatronProfileStorage(ProfileStorage):
         key = self.SYNCHRONIZE_ANNOTATIONS
         if key in settable:
             self.patron.synchronize_annotations = settable[key]
-
-
-class LoanAndHoldMixin(object):
-
-    @property
-    def work(self):
-        """Try to find the corresponding work for this Loan/Hold."""
-        license_pool = self.license_pool
-        if not license_pool:
-            return None
-        if license_pool.work:
-            return license_pool.work
-        if license_pool.presentation_edition and license_pool.presentation_edition.work:
-            return license_pool.presentation_edition.work
-        return None
-
-    @property
-    def library(self):
-        """Try to find the corresponding library for this Loan/Hold."""
-        if self.patron:
-            return self.patron.library
-        # If this Loan/Hold belongs to a external patron, there may be no library.
-        return None

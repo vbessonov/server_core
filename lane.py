@@ -49,8 +49,8 @@ from entrypoint import (
     EntryPoint,
     EverythingEntryPoint,
 )
-import core.model
-from core.model import *
+import model
+from model import *
 from facets import FacetConstants
 from problem_details import *
 from util import (

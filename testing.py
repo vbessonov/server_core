@@ -210,7 +210,7 @@ class DatabaseTest(object):
             id = self._str
         return Identifier.for_foreign_id(self._db, identifier_type, id)[0]
 
-    def _edition(self, data_source_name=DataSource.GUTENBERG,
+    def _edition(self, data_source_name=DataSourceConstants.GUTENBERG,
                  identifier_type=Identifier.GUTENBERG_ID,
                  with_license_pool=False, with_open_access_download=False,
                  title=None, language="eng", authors=None, identifier_id=None,
@@ -269,9 +269,9 @@ class DatabaseTest(object):
         if audience == Classifier.AUDIENCE_CHILDREN and not data_source_name:
             # TODO: This is necessary because Gutenberg's childrens books
             # get filtered out at the moment.
-            data_source_name = DataSource.OVERDRIVE
+            data_source_name = DataSourceConstants.OVERDRIVE
         elif not data_source_name:
-            data_source_name = DataSource.GUTENBERG
+            data_source_name = DataSourceConstants.GUTENBERG
         if fiction is None:
             fiction = True
         new_edition = False
@@ -423,7 +423,7 @@ class DatabaseTest(object):
         return record
 
     def _licensepool(self, edition, open_access=True,
-                     data_source_name=DataSource.GUTENBERG,
+                     data_source_name=DataSourceConstants.GUTENBERG,
                      with_open_access_download=False,
                      set_edition_as_presentation=False,
                      collection=None):
@@ -493,7 +493,7 @@ class DatabaseTest(object):
 
     def _customlist(self, foreign_identifier=None,
                     name=None,
-                    data_source_name=DataSource.NYT, num_entries=1,
+                    data_source_name=DataSourceConstants.NYT, num_entries=1,
                     entries_exist_as_works=True
     ):
         data_source = DataSource.lookup(self._db, data_source_name)
@@ -535,7 +535,7 @@ class DatabaseTest(object):
         )
         return complaint
 
-    def _credential(self, data_source_name=DataSource.GUTENBERG,
+    def _credential(self, data_source_name=DataSourceConstants.GUTENBERG,
                     type=None, patron=None):
         data_source = DataSource.lookup(self._db, data_source_name)
         type = type or self._str
@@ -615,20 +615,20 @@ class DatabaseTest(object):
         [alice], ignore = Contributor.lookup(self._db, u"Adder, Alice")
         alice.family_name, alice.display_name = alice.default_names()
 
-        edition_std_ebooks, pool_std_ebooks = self._edition(DataSource.STANDARD_EBOOKS, Identifier.URI,
+        edition_std_ebooks, pool_std_ebooks = self._edition(DataSourceConstants.STANDARD_EBOOKS, Identifier.URI,
             with_license_pool=True, with_open_access_download=True, authors=[])
         edition_std_ebooks.title = u"The Standard Ebooks Title"
         edition_std_ebooks.subtitle = u"The Standard Ebooks Subtitle"
         edition_std_ebooks.add_contributor(alice, Contributor.AUTHOR_ROLE)
 
-        edition_git, pool_git = self._edition(DataSource.PROJECT_GITENBERG, Identifier.GUTENBERG_ID,
+        edition_git, pool_git = self._edition(DataSourceConstants.PROJECT_GITENBERG, Identifier.GUTENBERG_ID,
             with_license_pool=True, with_open_access_download=True, authors=[])
         edition_git.title = u"The GItenberg Title"
         edition_git.subtitle = u"The GItenberg Subtitle"
         edition_git.add_contributor(bob, Contributor.AUTHOR_ROLE)
         edition_git.add_contributor(alice, Contributor.AUTHOR_ROLE)
 
-        edition_gut, pool_gut = self._edition(DataSource.GUTENBERG, Identifier.GUTENBERG_ID,
+        edition_gut, pool_gut = self._edition(DataSourceConstants.GUTENBERG, Identifier.GUTENBERG_ID,
             with_license_pool=True, with_open_access_download=True, authors=[])
         edition_gut.title = u"The GUtenberg Title"
         edition_gut.subtitle = u"The GUtenberg Subtitle"
@@ -905,7 +905,7 @@ class MockCoverageProvider(object):
 
     # Whenever a CoverageRecord is created, the data_source of that
     # record will be Project Gutenberg.
-    DATA_SOURCE_NAME = DataSource.GUTENBERG
+    DATA_SOURCE_NAME = DataSourceConstants.GUTENBERG
 
     # For testing purposes, this CoverageProvider will try to cover
     # every identifier in the database.
