@@ -26,7 +26,7 @@ from entrypoint import (
 )
 from facets import FacetConstants
 import model
-from model import (
+from core.model import (
     CachedFeed,
     ConfigurationSetting,
     Contributor,
@@ -543,7 +543,7 @@ class TestOPDS(DatabaseTest):
         # Verify that the same group_uri is created whether a Work or
         # a MaterializedWorkWithGenre is passed in.
         self.add_to_materialized_view([work])
-        from model import MaterializedWorkWithGenre
+        from core.model import MaterializedWorkWithGenre
         [mw] = self._db.query(MaterializedWorkWithGenre).all()
 
         mw_uri, mw_title = annotator.group_uri(mw, lp, lp.identifier)

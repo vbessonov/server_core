@@ -20,7 +20,7 @@ from . import (
 
 from opds import TestAnnotator
 
-from model import Identifier
+from core.model import Identifier
 
 from lane import (
     Facets,

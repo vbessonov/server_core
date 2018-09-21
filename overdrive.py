@@ -19,7 +19,7 @@ from config import (
     Configuration,
 )
 
-from model import (
+from core.model import (
     get_one,
     get_one_or_create,
     Collection,

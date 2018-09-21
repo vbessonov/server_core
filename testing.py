@@ -15,8 +15,8 @@ from config import Configuration
 from lane import (
     Lane,
 )
-from model.constants import MediaTypes
-from model import (
+from core.model.constants import MediaTypes
+from core.model import (
     Base,
     Classification,
     IntegrationClient,
@@ -709,7 +709,7 @@ class DatabaseTest(object):
         So we cannot see what's going on by going into postgres and running selects.
         This is the in-test alternative to going into postgres.
 
-        Can be called from model and metadata classes as well as tests.
+        Can be called from core.model and metadata classes as well as tests.
 
         NOTE: The purpose of this method is for debugging.
         Be careful of leaving it in code and potentially outputting

@@ -12,7 +12,7 @@ from lane import (
     Pagination,
     WorkList,
 )
-from model.cachedfeed import CachedFeed
+from core.model.cachedfeed import CachedFeed
 
 class TestCachedFeed(DatabaseTest):
 

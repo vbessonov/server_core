@@ -22,7 +22,7 @@ from coverage import (
 
 from config import CannotLoadConfiguration
 
-from model import (
+from core.model import (
     Collection,
     Contributor,
     DeliveryMechanism,

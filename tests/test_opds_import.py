@@ -41,7 +41,7 @@ from metadata_layer import (
     CirculationData,
     Metadata,
 )
-from model import (
+from core.model import (
     Collection,
     Contributor,
     CoverageRecord,

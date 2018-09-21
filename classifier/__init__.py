@@ -989,7 +989,7 @@ class WorkClassifier(object):
         try:
             from ..model import DataSource, Subject
         except ValueError:
-            from model import DataSource, Subject
+            from core.model import DataSource, Subject
 
         # We only consider a given classification once from a given
         # data source.
@@ -1405,7 +1405,7 @@ class WorkClassifier(object):
         try:
             from ..model import Genre
         except ValueError:
-            from model import Genre
+            from core.model import Genre
         genre, ignore = Genre.lookup(self._db, genre_data.name)
         self.genre_weights[genre] += weight
 

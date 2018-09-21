@@ -50,7 +50,7 @@ from metadata_layer import (
     MetaToModelUtility,
 )
 from mirror import MirrorUploader
-from model import (
+from core.model import (
     create,
     get_one,
     get_one_or_create,
@@ -2941,7 +2941,7 @@ class FixInvisibleWorksScript(CollectionInputScript):
             return
 
         # See how many works are in the materialized view.
-        from model import MaterializedWorkWithGenre as work_model
+        from core.model import MaterializedWorkWithGenre as work_model
         mv_works = self._db.query(work_model)
 
         if collections:

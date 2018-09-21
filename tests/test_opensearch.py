@@ -3,7 +3,7 @@ from nose.tools import (
     eq_,
 )
 
-from model import Genre
+from core.model import Genre
 from classifier import Classifier
 from opensearch import OpenSearchDocument
 from lane import Lane

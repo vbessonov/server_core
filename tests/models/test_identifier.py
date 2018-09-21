@@ -9,13 +9,13 @@ import datetime
 import feedparser
 from lxml import etree
 from .. import DatabaseTest
-from model.datasource import DataSource
-from model.edition import Edition
-from model.identifier import (
+from core.model.datasource import DataSource
+from core.model.edition import Edition
+from core.model.identifier import (
     Equivalency,
     Identifier,
 )
-from model.resource import (
+from core.model.resource import (
     Hyperlink,
     Representation,
 )

@@ -27,7 +27,7 @@ from util import LanguageCodes
 from util.personal_names import name_tidy
 from util.median import median
 from classifier import Classifier
-from model import (
+from core.model import (
     get_one,
     get_one_or_create,
     CirculationEvent,

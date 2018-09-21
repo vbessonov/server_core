@@ -5,7 +5,7 @@ from nose.tools import (
     eq_,
     set_trace,
 )
-from model import (
+from core.model import (
     Edition,
 )
 from entrypoint import (
@@ -106,7 +106,7 @@ class TestMediumEntryPoint(DatabaseTest):
         class Videos(MediumEntryPoint):
             INTERNAL_NAME = Edition.VIDEO_MEDIUM
 
-        from model import MaterializedWorkWithGenre
+        from core.model import MaterializedWorkWithGenre
         qu = self._db.query(MaterializedWorkWithGenre)
 
         # The default entry points filter out the video.

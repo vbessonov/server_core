@@ -12,7 +12,7 @@ from classifier import (
     GradeLevelClassifier,
     AgeClassifier,
 )
-from model import (
+from core.model import (
     ExternalIntegration,
     Work,
     WorkCoverageRecord,

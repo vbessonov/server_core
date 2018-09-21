@@ -365,7 +365,7 @@ class SessionManager(object):
                     primaryjoin="LicensePool.id==MaterializedWorkWithGenre.license_pool_id",
                     foreign_keys=LicensePool.id, lazy='joined', uselist=False)
 
-            import model
+            from core import model
             globals()['MaterializedWorkWithGenre'] = MaterializedWorkWithGenre
             model.MaterializedWorkWithGenre = MaterializedWorkWithGenre
 

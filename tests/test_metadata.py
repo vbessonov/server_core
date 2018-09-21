@@ -26,7 +26,7 @@ from metadata_layer import (
 )
 
 import os
-from model import (
+from core.model import (
     Contributor,
     CoverageRecord,
     DataSource,

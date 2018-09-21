@@ -16,7 +16,7 @@ from elasticsearch.exceptions import ElasticsearchException
 
 from config import CannotLoadConfiguration
 from lane import Lane
-from model import (
+from core.model import (
     Edition,
     ExternalIntegration,
     WorkCoverageRecord,

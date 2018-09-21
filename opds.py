@@ -32,7 +32,7 @@ from config import Configuration
 from classifier import Classifier
 from entrypoint import EntryPoint
 from facets import FacetConstants
-from model import (
+from core.model import (
     BaseMaterializedWork,
     CachedFeed,
     ConfigurationSetting,
