@@ -267,7 +267,7 @@ class Configuration(object):
     class __metaclass__(type):
         @property
         def instance(cls):
-            if not cls._instance:
+            if cls._instance is None:
                 # Load the Configuration object.
                 url = cls.database_url()
                 engine = create_engine(url)
@@ -290,7 +290,7 @@ class Configuration(object):
     def get(cls, key, default=None):
         if cls._instance is None:
             raise ValueError("No configuration object loaded!")
-        return cls._instance.get(key, default)
+        return cls.instance.get(key, default)
 
     @classmethod
     def required(cls, key):
