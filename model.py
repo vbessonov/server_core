@@ -331,6 +331,8 @@ class SessionManager(object):
 
     engine_for_url = {}
 
+    materialized_views_created = False
+
     @classmethod
     def engine(cls, url=None):
         url = url or Configuration.database_url()
@@ -412,7 +414,7 @@ class SessionManager(object):
         if connection:
             connection.close()
 
-        if create_materialized_work_class:
+        if not cls.materialized_views_created:
             class MaterializedWorkWithGenre(Base, BaseMaterializedWork):
                 __table__ = Table(
                     cls.MATERIALIZED_VIEW_LANES,
@@ -439,6 +441,7 @@ class SessionManager(object):
                     foreign_keys=LicensePool.id, lazy='joined', uselist=False)
 
             globals()['MaterializedWorkWithGenre'] = MaterializedWorkWithGenre
+            cls.materialized_views_created = True
 
         cls.engine_for_url[url] = engine
         return engine, engine.connect()
