@@ -288,8 +288,6 @@ class Configuration(object):
 
     @classmethod
     def get(cls, key, default=None):
-        if cls._instance is None:
-            raise ValueError("No configuration object loaded!")
         return cls.instance.get(key, default)
 
     @classmethod
