@@ -265,7 +265,7 @@ class Configuration(object):
     # Since the configuration file is now completely optional,
     # there's no information in that file that can be essential to
     # startup.
-    instance = {}
+    instance = None
 
     @classmethod
     def load(cls, _db):
@@ -291,10 +291,17 @@ class Configuration(object):
 
     @classmethod
     def get(cls, key, default=None):
+        if cls.instance is None:
+            raise ValueError("No configuration object loaded!")
         return cls.instance.get(key, default)
 
     @classmethod
     def required(cls, key):
+        if cls.instance is not None:
+            value = cls.get(key)
+            if value is not None:
+                return value
+
         value = cls.get(key)
         if value is not None:
             return value
@@ -533,7 +540,7 @@ class Configuration(object):
         return cls.instance.get(cls.SITE_CONFIGURATION_LAST_UPDATE, None)
 
     @classmethod
-    def load_from_file(cls, _db=None):
+    def load_from_file(cls):
         """Load additional site configuration from a config file.
 
         This is being phased out in favor of taking all configuration from a
@@ -560,3 +567,5 @@ class Configuration(object):
         lines = [x for x in str.split("\n")
                  if not (x.strip().startswith("#") or x.strip().startswith("//"))]
         return json.loads("\n".join(lines))
+
+Configuration.instance = Configuration.load_from_file()
