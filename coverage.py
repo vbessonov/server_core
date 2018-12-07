@@ -116,6 +116,40 @@ class BaseCoverageProvider(object):
     # doing this.
     DEFAULT_BATCH_SIZE = 100
 
+    @classmethod
+    def register(cls, coverage_record_class, item, force=False):
+        """Registers a work for future coverage.
+
+        This method is primarily for use with CoverageProviders that use the
+        `registered_only` flag to process items. It's currently only in use
+        on the Metadata Wrangler.
+
+        This method is not called on its own, only by
+        WorkCoverageProvider.register and
+        ContributorCoverageProvider.register.
+
+        :param coverage_record_class: Use this class to create
+        coverage records.
+
+        :param force: Set to True to reset an existing coverage
+        record's status "registered", regardless of its current
+        status.
+        """
+        was_registered = True
+        if not force:
+            record = coverage_record_class.lookup(work, cls.OPERATION)
+            if record:
+                was_registered = False
+                return record, was_registered
+
+        # add_for() overwrites the status, so it can be used
+        # both to create and to force-register records.
+        record, is_new = coverage_record_class.add_for(
+            work, cls.OPERATION, status=CoverageRecord.REGISTERED
+        )
+        return record, was_registered
+
+
     def __init__(self, _db, batch_size=None, cutoff_time=None,
         registered_only=False,
     ):
@@ -385,21 +419,24 @@ class BaseCoverageProvider(object):
         only items that need coverage *and* are associated with one
         of these identifiers.
 
-        Implemented in CoverageProvider and WorkCoverageProvider.
+        Implemented in CoverageProvider, WorkCoverageProvider,
+        and ContributorCoverageProvider.
         """
         raise NotImplementedError()
 
     def add_coverage_record_for(self, item):
         """Add a coverage record for the given item.
 
-        Implemented in IdentifierCoverageProvider and WorkCoverageProvider.
+        Implemented in IdentifierCoverageProvider, WorkCoverageProvider,
+        and ContributorCoverageProvider.
         """
         raise NotImplementedError()
 
     def record_failure_as_coverage_record(self, failure):
         """Convert the given CoverageFailure to a coverage record.
 
-        Implemented in IdentifierCoverageProvider and WorkCoverageProvider.
+        Implemented in IdentifierCoverageProvider, WorkCoverageProvider,
+        and ContributorCoverageProvider.
         """
         raise NotImplementedError()
 
@@ -407,8 +444,8 @@ class BaseCoverageProvider(object):
         """Create a CoverageFailure recording the coverage provider's
         failure to even try to process an item.
 
-        Implemented in IdentifierCoverageProvider and
-        WorkCoverageProvider.
+        Implemented in IdentifierCoverageProvider,
+        WorkCoverageProvider, and ContributorCoverageProvider.
         """
         raise NotImplementedError()
 
@@ -416,8 +453,10 @@ class BaseCoverageProvider(object):
         """Do the work necessary to give coverage to one specific item.
 
         Since this is where the actual work happens, this is not
-        implemented in IdentifierCoverageProvider or
-        WorkCoverageProvider, and must be handled in a subclass.
+        implemented in IdentifierCoverageProvider,
+        WorkCoverageProvider, or ContributorCoverageProvider. It must
+        be handled in a subclass.
+
         """
         raise NotImplementedError()
 
@@ -1249,19 +1288,9 @@ class WorkCoverageProvider(BaseCoverageProvider):
         :param force: Set to True to reset an existing CoverageRecord's status
         "registered", regardless of its current status.
         """
-        was_registered = True
-        if not force:
-            record = WorkCoverageRecord.lookup(work, cls.OPERATION)
-            if record:
-                was_registered = False
-                return record, was_registered
-
-        # WorkCoverageRecord.add_for overwrites the status already,
-        # so it can be used to create and to force-register records.
-        record, is_new = WorkCoverageRecord.add_for(
-            work, cls.OPERATION, status=CoverageRecord.REGISTERED
+        return BaseCoverageProvider.register(
+            WorkCoverageRecord, work, force
         )
-        return record, was_registered
 
     #
     # Implementation of BaseCoverageProvider virtual methods.
@@ -1459,3 +1488,59 @@ class WorkClassificationCoverageProvider(
     # This is going to be expensive -- we might as well recalculate
     # everything.
     POLICY = PresentationCalculationPolicy.recalculate_everything()
+
+
+class ContributorCoverageProvider(BaseCoverageProvider):
+    """Perform coverage operations on Contributors rather than
+    Identifiers.
+    """
+
+    @classmethod
+    def register(cls, contributor, force=False):
+        return BaseCoverageProvider.register(
+            ContributorCoverageRecord, contributor, work
+        )
+
+    def items_that_need_coverage(self, identifiers, **kwargs):
+        """Find all Contributors lacking coverage from this CoverageProvider.
+
+        By default, all Contributors which don't already have coverage are
+        chosen.
+
+        :param: Only Contributors associated with an Edition with one of
+        the given Identifiers are chosen.
+        """
+        qu = Contributor.missing_coverage_from(
+            self._db, operation=self.operation,
+            count_as_missing_before=self.cutoff_time,
+            **kwargs
+        )
+        if identifiers:
+            ids = [x.id for x in identifiers]
+            qu = qu.join(Contributor.contributions).join(Contribution.edition).filter(
+                Edition.primary_identifier_id.in_(ids)
+            )
+
+        if self.registered_only:
+            # Return Identifiers that have been "registered" for coverage
+            # or already have a failure from previous coverage attempts.
+            qu = qu.filter(ContributorCoverageRecord.id != None)
+
+        return qu
+
+    def add_coverage_record_for(self):
+        record, is_new = ContributorCoverageRecord.add_for(
+            item, data_source=self.data_source, operation=self.operation,
+        )
+        record.status = CoverageRecord.SUCCESS
+        record.exception = None
+        return record
+
+    def record_failure_as_coverage_record(self, failure):
+        """Turn a CoverageFailure into a WorkCoverageRecord object."""
+        return failure.to_contributor_coverage_record(operation=self.operation)
+
+    def failure_for_ignored_item(self, item):
+        return CoverageFailure(
+            work, "Was ignored by ContributorCoverageProvider.", transient=True
+        )

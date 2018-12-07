@@ -29,8 +29,8 @@ from sqlalchemy.sql.expression import (
 )
 
 class BaseCoverageRecord(object):
-    """Contains useful constants used by both CoverageRecord and
-    WorkCoverageRecord.
+    """Contains useful constants used by CoverageRecord,
+    WorkCoverageRecord, and ContributorCovreageRecord.
     """
 
     SUCCESS = u'success'
