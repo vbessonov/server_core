@@ -26,6 +26,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import Session
 from ..user_profile import ProfileStorage
 import uuid
+import random
+import string
 
 class LoanAndHoldMixin(object):
 
@@ -163,7 +165,12 @@ class Patron(Base):
             if generator and callable(generator):
                 identifier = generator()
             else:
-                identifier = str(uuid.uuid1())
+                identifier = self.authorization_identifier
+            # TODO: if we know their email address then use their actual barcode, otherwise add
+            # random characters
+            # if not email:
+            #     identifier += "".join([random.choice(string.digits) for i in range(6)])
+            
             credential.credential = identifier
         credential = Credential.lookup(
             _db, remote_data_source, Credential.IDENTIFIER_TO_REMOTE_SERVICE,
