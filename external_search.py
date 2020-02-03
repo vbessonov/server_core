@@ -1623,6 +1623,7 @@ class Query(SearchBase):
         # for "asteroids", and see if it gets better results than
         # searching for "nonfiction asteroids" in the text fields
         # (which it will).
+
         if self.use_query_parser:
             sub_hypotheses, filters = self.parsed_query_matches
             if sub_hypotheses or filters:
@@ -1646,7 +1647,7 @@ class Query(SearchBase):
                         boost = self.SLIGHTLY_ABOVE_BASELINE
                 self._hypothesize(
                     hypotheses, sub_hypotheses, boost, all_must_match=True,
-                    filters=filters
+                    filters=filters, apply_language_filter=False
                 )
 
         # That's it!
@@ -1654,15 +1655,6 @@ class Query(SearchBase):
         # The score of any given book is the maximum score it gets from
         # any of these hypotheses.
         result = self._combine_hypotheses(hypotheses)
-        if not self.use_query_parser and self.default_languages:
-            # In the absence of anything in the query string
-            # telling us which language to use, add a filter on
-            # the default languageset.
-            set_trace()
-            match_filter = Terms(**{'language': self.default_languages})
-            result = self._boost(
-                1, [result], filters=match_filter, all_must_match=True
-            )
 
         from pprint import pprint
         pprint(result.to_dict())
@@ -1945,8 +1937,7 @@ class Query(SearchBase):
         kwargs['prefix_length'] = 1
         yield Match(**{field_name : kwargs}), self.fuzzy_coefficient * 0.75
 
-    @classmethod
-    def _hypothesize(cls, hypotheses, query, boost, filters=None, **kwargs):
+    def _hypothesize(self, hypotheses, query, boost, filters=None, apply_language_filter=True, **kwargs):
         """Add a hypothesis to the ones to be tested for each book.
 
         :param hypotheses: A list of active hypotheses, to be
@@ -1961,8 +1952,16 @@ class Query(SearchBase):
 
         :param kwargs: Keyword arguments for the _boost method.
         """
+        if filters is None:
+            filters = []
+        else:
+            filters = list(filters)
+        if self.default_languages and apply_language_filter:
+            match_filter = Terms(**{'language': self.default_languages})
+            filters.append(match_filter)
+
         if query or filters:
-            query = cls._boost(boost=boost, queries=query, filters=filters, **kwargs)
+            query = self._boost(boost=boost, queries=query, filters=filters, **kwargs)
         if query:
             hypotheses.append(query)
         return hypotheses
@@ -2092,14 +2091,8 @@ class QueryParser(object):
         # and see what its .elasticsearch_query is.
         if (self.final_query_string
             and self.final_query_string != self.original_query_string):
-            filter = None
-            if self.default_languages:
-                # Make sure the default languages are propagated to the
-                # new query.
-                filter = Filter(languages=self.default_languages)
             recursive = self.query_class(
                 self.final_query_string, use_query_parser=False,
-                filter=filter
             ).elasticsearch_query
             self.match_queries.append(recursive)
 
