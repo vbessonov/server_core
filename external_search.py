@@ -1432,7 +1432,7 @@ class Query(SearchBase):
         self.filter = filter
         self.default_languages = None
         if self.filter:
-            self.default_languages = self.filter.languages
+            self.default_languages = scrub_list(self.filter.languages)
         self.use_query_parser = use_query_parser
 
         # Pre-calculate some values that will be checked frequently
@@ -1641,10 +1641,7 @@ class Query(SearchBase):
                     # string. We'll boost works that match the filter
                     # slightly, but overall the goal here is to get
                     # better results by filtering out junk.
-                    if any (getattr(x, 'language') for x in filters):
-                        boost = self.QUERY_WAS_A_FILTER_WEIGHT
-                    else:
-                        boost = self.SLIGHTLY_ABOVE_BASELINE
+                    boost = self.SLIGHTLY_ABOVE_BASELINE
                 self._hypothesize(
                     hypotheses, sub_hypotheses, boost, all_must_match=True,
                     filters=filters, apply_language_filter=False
@@ -2496,9 +2493,6 @@ class Filter(SearchBase):
 
         if self.media:
             f = chain(f, Terms(medium=scrub_list(self.media)))
-
-        if self.languages and apply_language_filter:
-            f = chain(f, Terms(language=scrub_list(self.languages)))
 
         if self.fiction is not None:
             if self.fiction:
