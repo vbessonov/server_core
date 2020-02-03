@@ -1432,7 +1432,7 @@ class Query(SearchBase):
         self.filter = filter
         self.default_languages = None
         if self.filter:
-            self.default_languages = scrub_list(self.filter.languages)
+            self.default_languages = Filter._scrub_list(self.filter.languages)
         self.use_query_parser = use_query_parser
 
         # Pre-calculate some values that will be checked frequently
@@ -1564,17 +1564,34 @@ class Query(SearchBase):
     def elasticsearch_query(self):
         """Build an Elasticsearch-DSL Query object for this query string."""
 
-        # The query will most likely be a dis_max query, which tests a
-        # number of hypotheses about what the query string might
-        # 'really' mean. For each book, the highest-rated hypothesis
-        # will be assumed to be true, and the highest-rated titles
+        # By default, match everything and do not use a subquery.
+        # This handles the case where there is no query string.
+        main_query = MatchAll()
+        subquery = None
+
+        if self.query_string:
+            main_query = self._build_main_query()
+            subquery = self._build_query_from_query_string()
+
+        if main_query and subquery:
+            # We have both a main query and a subquery. Create a
+            # dis_max query for both and see which one wins.
+            final_query = DisMax(queries=[main_query, subquery])
+        else:
+            final_query = main_query
+
+        from pprint import pprint
+        pprint(final_query.to_dict())
+        return final_query
+
+    def _build_main_query(self):
+        # The query will be a dis_max query, which tests a number
+        # of hypotheses about what the query string might 'really'
+        # mean. For each book, the highest-rated hypothesis will
+        # be assumed to be true, and the highest-rated titles
         # overall will become the search results.
         hypotheses = []
-
-        if not self.query_string:
-            # There is no query string. Match everything.
-            return MatchAll()
-
+            
         # Here are the hypotheses:
 
         # The query string might be a match against a single field:
@@ -1605,10 +1622,12 @@ class Query(SearchBase):
             # pure match against the field we're checking.
             for multi_match, weight in self.title_multi_match_for(other_field):
                 self._hypothesize(hypotheses, multi_match, weight)
+        return self._combine_hypotheses(hypotheses)
 
-        # Finally, the query string might contain a filter portion
-        # (e.g. a genre name or target age), with the remainder being
-        # the "real" query string.
+    def _build_query_from_query_string(self):
+        # Alternatively, the query string might contain a filter
+        # portion (e.g. a genre name or target age), with the
+        # remainder being the "real" query string.
         #
         # In a query like "nonfiction asteroids", "nonfiction" would
         # be the filter portion and "asteroids" would be the query
@@ -1621,19 +1640,27 @@ class Query(SearchBase):
         #
         # In other words, we should try searching across nonfiction
         # for "asteroids", and see if it gets better results than
-        # searching for "nonfiction asteroids" in the text fields
-        # (which it will).
-
+        # searching for "nonfiction asteroids" in the text fields.
+        subquery = None
         if self.use_query_parser:
-            sub_hypotheses, filters = self.parsed_query_matches
-            if sub_hypotheses or filters:
-                if not sub_hypotheses:
+            subquery_hypotheses, subquery_filters = self.parsed_query_matches
+            if subquery_hypotheses or subquery_filters:
+                if not subquery_hypotheses:
                     # The entire search string was converted into a
                     # filter (e.g. "young adult romance"). Everything
                     # that matches this filter should be matched, and
                     # it should be given a relatively high boost.
-                    sub_hypotheses = MatchAll()
-                    boost = self.QUERY_WAS_A_FILTER_WEIGHT
+                    subquery = MatchAll()
+                    subquery_boost = self.QUERY_WAS_A_FILTER_WEIGHT
+
+                    # The boost should be even higher if the search
+                    # string included a language filter (e.g. 'spanish
+                    # romance'). But not incredibly high, because of
+                    # English-language searches like 'italian
+                    # cooking'.
+                    if (any(getattr(x, 'language', None)
+                            for x in subquery_filters)):
+                        subquery_boost *= 2
                 else:
                     # Part of the search string is a filter, and part
                     # of it is a bunch of hypotheses that combine with
@@ -1641,22 +1668,15 @@ class Query(SearchBase):
                     # string. We'll boost works that match the filter
                     # slightly, but overall the goal here is to get
                     # better results by filtering out junk.
-                    boost = self.SLIGHTLY_ABOVE_BASELINE
-                self._hypothesize(
-                    hypotheses, sub_hypotheses, boost, all_must_match=True,
-                    filters=filters, apply_language_filter=False
+                    subquery = self._combine_hypotheses(
+                        subquery_hypotheses
+                    )
+                    subquery_boost = self.SLIGHTLY_ABOVE_BASELINE
+                subquery = self._boost(
+                    subquery_boost, [subquery], subquery_filters,
+                    all_must_match=True
                 )
-
-        # That's it!
-
-        # The score of any given book is the maximum score it gets from
-        # any of these hypotheses.
-        result = self._combine_hypotheses(hypotheses)
-
-        from pprint import pprint
-        pprint(result.to_dict())
-        return result
-
+        return subquery
 
     def match_one_field_hypotheses(self, base_field, query_string=None):
         """Yield a number of hypotheses representing different ways in
@@ -2058,10 +2078,14 @@ class QueryParser(object):
             query_string = self.add_match_terms_filter(
                 language_codes, 'language', query_string, language_name
             )
-        elif self.default_languages:
+        elif self.default_languages and self.filters:
             # It looks like the user didn't express an explicit
             # preference about language. Inherit the default language
             # filter.
+            #
+            # Only do this if there is some other filter in play. If
+            # there are no other filters, then this method should
+            # return nothing.
             match_query = self.query_class._match_terms(
                 'language', self.default_languages
             )
