@@ -70,6 +70,7 @@ from selftest import (
     HasSelfTests,
     SelfTestResult,
 )
+from util.languages import LanguageNames
 from util.personal_names import display_name_to_sort_name
 from util.problem_detail import ProblemDetail
 from util.stopwords import ENGLISH_STOPWORDS
@@ -1254,6 +1255,14 @@ class SearchBase(object):
         return cls._nestable(field, match_query)
 
     @classmethod
+    def _match_terms(cls, field, query_string):
+        """A clause that matches the query string against a specific field in
+        the search document.
+        """
+        match_query = Terms(**{field: query_string})
+        return cls._nestable(field, match_query)
+
+    @classmethod
     def _match_range(cls, field, operation, value):
         """Match a ranged value for a field, using an operation other than
         equality.
@@ -1421,6 +1430,9 @@ class Query(SearchBase):
         """
         self.query_string = query_string or ""
         self.filter = filter
+        self.default_languages = None
+        if self.filter:
+            self.default_languages = self.filter.languages
         self.use_query_parser = use_query_parser
 
         # Pre-calculate some values that will be checked frequently
@@ -1489,6 +1501,7 @@ class Query(SearchBase):
             base_filter, nested_filters = self.filter.build()
         else:
             base_filter = None
+            language_filter = None
             nested_filters = defaultdict(list)
 
         # Combine the query's base Filter with the universal base
@@ -1627,7 +1640,10 @@ class Query(SearchBase):
                     # string. We'll boost works that match the filter
                     # slightly, but overall the goal here is to get
                     # better results by filtering out junk.
-                    boost = self.SLIGHTLY_ABOVE_BASELINE
+                    if any (getattr(x, 'language') for x in filters):
+                        boost = self.QUERY_WAS_A_FILTER_WEIGHT
+                    else:
+                        boost = self.SLIGHTLY_ABOVE_BASELINE
                 self._hypothesize(
                     hypotheses, sub_hypotheses, boost, all_must_match=True,
                     filters=filters
@@ -1637,7 +1653,21 @@ class Query(SearchBase):
 
         # The score of any given book is the maximum score it gets from
         # any of these hypotheses.
-        return self._combine_hypotheses(hypotheses)
+        result = self._combine_hypotheses(hypotheses)
+        if not self.use_query_parser and self.default_languages:
+            # In the absence of anything in the query string
+            # telling us which language to use, add a filter on
+            # the default languageset.
+            set_trace()
+            match_filter = Terms(**{'language': self.default_languages})
+            result = self._boost(
+                1, [result], filters=match_filter, all_must_match=True
+            )
+
+        from pprint import pprint
+        pprint(result.to_dict())
+        return result
+
 
     def match_one_field_hypotheses(self, base_field, query_string=None):
         """Yield a number of hypotheses representing different ways in
@@ -1886,7 +1916,12 @@ class Query(SearchBase):
         information is used in a simple query that matches basic
         fields.
         """
-        parser = QueryParser(self.query_string)
+        languages = None
+        if self.filter:
+            languages = self.filter.languages
+        parser = QueryParser(
+            self.query_string, default_languages=languages
+        )
         return parser.match_queries, parser.filters
 
     def _fuzzy_matches(self, field_name, **kwargs):
@@ -1942,17 +1977,19 @@ class QueryParser(object):
       grade 5 dogs
       young adult romance
       divorce age 10 and up
+      odyssey in greek
 
     These queries contain information that can best be thought of in
     terms of a filter against specific fields ("nonfiction", "grade
-    5", "romance"). Books either match these criteria or they don't.
+    5", "romance", "greek"). Books either match these criteria or they don't.
 
     These queries may also contain information that can be thought of
-    in terms of a search ("asteroids", "dogs") -- books may match
+    in terms of a search ("asteroids", "dogs", "odyssey") -- books may match
     these criteria to a greater or lesser extent.
     """
 
-    def __init__(self, query_string, query_class=Query):
+    def __init__(self, query_string, query_class=Query,
+                 default_languages=None):
         """Parse the query string and create a list of clauses
         that will boost certain types of books.
 
@@ -1963,6 +2000,7 @@ class QueryParser(object):
         """
         self.original_query_string = query_string.strip()
         self.query_class = query_class
+        self.default_languages = default_languages
 
         # We start with no match queries and no filter.
         self.match_queries = []
@@ -2013,6 +2051,26 @@ class QueryParser(object):
             age = None
         query_string = self.add_target_age_filter(age, query_string, age_match)
 
+        language_match = LanguageNames.name_re.search(query_string)
+        if language_match:
+            # It looks like the user is trying to search for works in
+            # a particular language.
+            language_name = language_match.groups()[0]
+            language_codes = list(
+                LanguageNames.name_to_codes[language_name]
+            )
+            query_string = self.add_match_terms_filter(
+                language_codes, 'language', query_string, language_name
+            )
+        elif self.default_languages:
+            # It looks like the user didn't express an explicit
+            # preference about language. Inherit the default language
+            # filter.
+            match_query = self.query_class._match_terms(
+                'language', self.default_languages
+            )
+            self.filters.append(match_query)
+
         self.final_query_string = query_string.strip()
 
         if len(self.final_query_string) == 0:
@@ -2034,8 +2092,14 @@ class QueryParser(object):
         # and see what its .elasticsearch_query is.
         if (self.final_query_string
             and self.final_query_string != self.original_query_string):
+            filter = None
+            if self.default_languages:
+                # Make sure the default languages are propagated to the
+                # new query.
+                filter = Filter(languages=self.default_languages)
             recursive = self.query_class(
-                self.final_query_string, use_query_parser=False
+                self.final_query_string, use_query_parser=False,
+                filter=filter
             ).elasticsearch_query
             self.match_queries.append(recursive)
 
@@ -2050,6 +2114,20 @@ class QueryParser(object):
             # This is not a relevant part of the query string.
             return query_string
         match_query = self.query_class._match_term(field, query)
+        self.filters.append(match_query)
+        return self._without_match(query_string, matched_portion)
+
+    def add_match_terms_filter(self, values, field, query_string, matched_portion):
+        """Create a match query that finds documents whose value for `field`
+        matches any value in `values`.
+
+        Add it to `self.filters`, and remove the relevant portion
+        of `query_string` so it doesn't get reused.
+        """
+        if not values:
+            # This is not a relevant part of the query string.
+            return query_string
+        match_query = self.query_class._match_terms(field, values)
         self.filters.append(match_query)
         return self._without_match(query_string, matched_portion)
 
@@ -2377,7 +2455,7 @@ class Filter(SearchBase):
             return as_is
         return with_all_ages
 
-    def build(self, _chain_filters=None):
+    def build(self, _chain_filters=None, apply_language_filter=True):
         """Convert this object to an Elasticsearch Filter object.
 
         :return: A 2-tuple (filter, nested_filters). Filters on fields
@@ -2426,7 +2504,7 @@ class Filter(SearchBase):
         if self.media:
             f = chain(f, Terms(medium=scrub_list(self.media)))
 
-        if self.languages:
+        if self.languages and apply_language_filter:
             f = chain(f, Terms(language=scrub_list(self.languages)))
 
         if self.fiction is not None:
