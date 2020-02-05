@@ -78,7 +78,7 @@ def native_string(x):
     removed once we convert to Python 3.
     """
     if sys.version_info.major == 2:
-        if isinstance(x, unicode):
+        if isinstance(x, str):
             x = x.encode("utf8")
     else:
         if isinstance(x, bytes):

@@ -53,7 +53,7 @@ class TestAtomFeed(object):
         AtomFeed.add_link_to_entry(entry, [link_child], **kwargs)
         # TODO PYTHON3 the attributes come out in a different order.
         assert (
-            u'<link extra="extra info" href="url" title="1"><link_child/>'
+            '<link extra="extra info" href="url" title="1"><link_child/>'
             in etree.tounicode(entry)
         )
 

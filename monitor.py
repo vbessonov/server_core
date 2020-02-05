@@ -13,11 +13,11 @@ from sqlalchemy.sql.expression import (
     outerjoin,
 )
 
-import log # This sets the appropriate log format and level.
-from config import Configuration
-from coverage import CoverageFailure
-from metadata_layer import TimestampData
-from model import (
+from . import log # This sets the appropriate log format and level.
+from .config import Configuration
+from .coverage import CoverageFailure
+from .metadata_layer import TimestampData
+from .model import (
     get_one,
     get_one_or_create,
     CachedFeed,
@@ -194,7 +194,7 @@ class Monitor(object):
                 # This will be treated the same as an unhandled
                 # exception, below.
                 exception = new_timestamp.exception
-        except Exception, e:
+        except Exception as e:
             this_run_finish = datetime.datetime.utcnow()
             self.log.error(
                 "Error running %s monitor. Timestamp will not be updated.",
@@ -674,13 +674,13 @@ class MakePresentationReadyMonitor(NotPresentationReadyWorkSweepMonitor):
 
         try:
             self.prepare(work)
-        except CoverageProvidersFailed, e:
+        except CoverageProvidersFailed as e:
             exception = "Provider(s) failed: %s" % e
-        except Exception, e:
+        except Exception as e:
             self.log.error(
                 "Exception processing work %r", work, exc_info=e
             )
-            exception = unicode(e)
+            exception = str(e)
 
         if exception:
             # Unlike with most Monitors, an exception is not a good
