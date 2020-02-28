@@ -742,18 +742,24 @@ class TestMetadataImporter(DatabaseTest):
         eq_(last_update, coverage.timestamp)
         eq_(u"New title", edition.title)
 
+        # This Metadata is ignored because it appears to be come from
+        # 2014, long before the last update time for the Edition.
         older_last_update = datetime.datetime(2014, 1, 1)
         m = Metadata(data_source=data_source,
                      title=u"Another new title",
                      data_source_last_updated=older_last_update
         )
         m.apply(edition, None)
-        eq_(u"New title", edition.title)
 
+        # The title and the CoverageRecord timestamp are unchanged.
+        eq_(u"New title", edition.title)
         coverage = CoverageRecord.lookup(edition, data_source)
         eq_(last_update, coverage.timestamp)
 
-        m.apply(edition, None, force=True)
+        # A ReplacementPolicy can force an update even if the incoming
+        # data appears to be older than the existing data.
+        policy = ReplacementPolicy(even_if_not_apparently_updated=True)
+        m.apply(edition, None, replace=policy)
         eq_(u"Another new title", edition.title)
         coverage = CoverageRecord.lookup(edition, data_source)
         eq_(older_last_update, coverage.timestamp)

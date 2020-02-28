@@ -1657,25 +1657,23 @@ class Metadata(MetaToModelUtility):
     ]
     REL_REQUIRES_FULL_RECALCULATION = [LinkRelations.DESCRIPTION]
 
-    # TODO: We need to change all calls to apply() to use a ReplacementPolicy
-    # instead of passing in individual `replace` arguments. Once that's done,
-    # we can get rid of the `replace` arguments.
-    def apply(self, edition, collection, metadata_client=None, replace=None,
-              replace_identifiers=False,
-              replace_subjects=False,
-              replace_contributions=False,
-              replace_links=False,
-              replace_formats=False,
-              replace_rights=False,
-              force=False,
-    ):
+    def apply(self, edition, collection, metadata_client=None, replace=None):
         """Apply this metadata to the given edition.
 
-        :return: (edition, made_core_changes), where edition is the newly-updated object, and made_core_changes
-            answers the question: were any edition core fields harmed in the making of this update?
-            So, if title changed, return True.
-            New: If contributors changed, this is now considered a core change,
-            so work.simple_opds_feed refresh can be triggered.
+        :param edition: An Edition.
+        :param collection: A Collection.
+        :param metadata_client: A MetadataWranglerOPDSLookup.
+
+        :param replace: A ReplacementPolicy. The default is to treat the
+            Metadata as a reliable source of metadata but not of circulation
+            or format data.
+
+        :return: A 2-tuple (`edition`, `made_core_changes`). `edition`
+            is the Edition originally passed in to the
+            method. `made_core_changes` answers the question: were any
+            significant changes made to the Edition itself? This
+            includes scalar values such as `Edition.title` as well as
+            some lists such as the list of contributors.
         """
         _db = Session.object_session(edition)
 
@@ -1690,41 +1688,17 @@ class Metadata(MetaToModelUtility):
         work_requires_new_presentation_edition = False
 
         if replace is None:
-            replace = ReplacementPolicy(
-                identifiers=replace_identifiers,
-                subjects=replace_subjects,
-                contributions=replace_contributions,
-                links=replace_links,
-                formats=replace_formats,
-                rights=replace_rights,
-                even_if_not_apparently_updated=force
-            )
+            replace = ReplacementPolicy.from_metadata_source()
 
         # We were given an Edition, so either this metadata's
         # primary_identifier must be missing or it must match the
         # Edition's primary identifier.
-        if self.primary_identifier:
-            if (self.primary_identifier.type != edition.primary_identifier.type
-                or self.primary_identifier.identifier != edition.primary_identifier.identifier):
-                raise ValueError(
-                    "Metadata's primary identifier (%s/%s) does not match edition's primary identifier (%r)" % (
-                        self.primary_identifier.type,
-                        self.primary_identifier.identifier,
-                        edition.primary_identifier,
-                    )
-                )
+        self._validate_primary_identifier(edition)
 
         # Check whether we should do any work at all.
         data_source = self.data_source(_db)
-
-        if self.data_source_last_updated and not replace.even_if_not_apparently_updated:
-            coverage_record = CoverageRecord.lookup(edition, data_source)
-            if coverage_record:
-                check_time = coverage_record.timestamp
-                last_time = self.data_source_last_updated
-                if check_time >= last_time:
-                    # The metadata has not changed since last time. Do nothing.
-                    return edition, False
+        if not self._should_do_update(edition, data_source, replace):
+            return edition, False
 
         if metadata_client and not self.permanent_work_id:
             self.calculate_permanent_work_id(_db, metadata_client)
@@ -1996,6 +1970,58 @@ class Metadata(MetaToModelUtility):
 
         return edition, work_requires_new_presentation_edition
 
+    def _validate_primary_identifier(self, edition):
+        """Raise an exception if there's an identifier mismatch between
+        this object and the given Edition.
+
+        :param edition: An Edition.
+        :raise ValueError: If there's an identifier mismatch.
+        """
+        if not self.primary_identifier or not edition.primary_identifier:
+            # Metadata and/or Edition have no associated identifier,
+            # so there can't be a mismatch.
+            return
+
+        metadata_i = self.primary_identifier
+        edition_i = edition.primary_identifier
+
+        if (metadata_i.type != edition_i.type
+            or metadata_i.identifier != edition_i.identifier):
+            raise ValueError(
+                "Metadata's primary identifier (%s/%s) does not match edition's primary identifier (%r)" % (
+                    metadata_i.type, metadata_i.identifier, edition_i,
+                )
+            )
+
+    def _should_do_update(self, edition, data_source, policy):
+
+        if policy.even_if_not_apparently_updated:
+            # Policy says we will always update no matter what.
+            return True
+
+        metadata_time = self.data_source_last_updated
+        if not metadata_time:
+            # We have no record of when the data used in the Metadata
+            # was updated, so we have no way of knowing whether it's
+            # newer or older than the data in the Edition. We will
+            # always update.
+            return True
+
+        # We know when the data in the Metadata was updated; check to see
+        # when the Edition was updated.
+        coverage_record = CoverageRecord.lookup(edition, data_source)
+        if not coverage_record:
+            # Edition has never been updated; update now.
+            return True
+
+        edition_time = coverage_record.timestamp
+        if edition_time < metadata_time:
+            # The Edition was updated earlier than the Metadata; we will
+            # update.
+            return True
+
+        # The Edition was updated after the Metadata; no need to update.
+        return False
 
     def make_thumbnail(self, data_source, link, link_obj):
         """Make sure a Hyperlink representing an image is connected
