@@ -1722,48 +1722,10 @@ class Metadata(MetaToModelUtility):
         if contributors_changed:
             work_requires_new_presentation_edition = True
 
-        self.update_identifiers(identifier, replace.identifiers)
+        ignore = self.update_identifiers(identifier, replace.identifiers)
 
-        new_subjects = {}
-        if self.subjects:
-            new_subjects = dict(
-                (subject.key, subject)
-                for subject in self.subjects
-            )
-        if replace.subjects:
-            # Remove any old Subjects from this data source, unless they
-            # are also in the list of new subjects.
-            surviving_classifications = []
-
-            def _key(classification):
-                s = classification.subject
-                return s.type, s.identifier, s.name, classification.weight
-
-            for classification in identifier.classifications:
-                if classification.data_source == data_source:
-                    key = _key(classification)
-                    if not key in new_subjects:
-                        # The data source has stopped claiming that
-                        # this classification should exist.
-                        _db.delete(classification)
-                        work_requires_full_recalculation = True
-                    else:
-                        # The data source maintains that this
-                        # classification is a good idea. We don't have
-                        # to do anything.
-                        del new_subjects[key]
-                        surviving_classifications.append(classification)
-                else:
-                    # This classification comes from some other data
-                    # source.  Don't mess with it.
-                    surviving_classifications.append(classification)
-            identifier.classifications = surviving_classifications
-
-        # Apply all new subjects to the identifier.
-        for subject in new_subjects.values():
-            identifier.classify(
-                data_source, subject.type, subject.identifier,
-                subject.name, weight=subject.weight)
+        classifications_changed = self.update_classifications(identifier)
+        if classifications_changed:
             work_requires_full_recalculation = True
 
         # Associate all links with the primary identifier.
@@ -2121,7 +2083,6 @@ class Metadata(MetaToModelUtility):
         """Mark this Metadata's IdentifierData objects as equivalent to the
         given Identifier.
 
-        :param _db: A database connection.
         :param target: An Identifier.
         :param replace: Set this to true and any equivalent Identifiers
            previously set from this data source will be removed if they 
@@ -2144,6 +2105,65 @@ class Metadata(MetaToModelUtility):
             )
             target.equivalent_to(
                 data_source, new_identifier, identifier_data.weight
+            )
+            changed = True
+        return changed
+
+    def update_classifications(self, target, replace=True):
+        """Convert this Metadata's SubjectData objects into Classifications
+        on the given Identifier.
+
+        :param target: An Identifier.
+        :param replace: Set this to true and any Classifications
+           previously set from this data source will be removed if they 
+           are not _currently_ present.
+        :return: True if any Classifications were added or removed.
+        """
+        changed = False
+        _db = Session.object_session(target)
+        data_source = self.data_source(_db)
+
+        new_subjects = {}
+        if self.subjects:
+            new_subjects = dict(
+                (subject.key, subject)
+                for subject in self.subjects
+            )
+
+        if replace:
+            # Remove any old Subjects from this data source, unless they
+            # are also in the list of new subjects.
+            surviving_classifications = []
+
+            def _key(classification):
+                s = classification.subject
+                return s.type, s.identifier, s.name, classification.weight
+
+            for classification in target.classifications:
+                if classification.data_source == data_source:
+                    key = _key(classification)
+                    if not key in new_subjects:
+                        # The data source has stopped claiming that
+                        # this classification should exist.
+                        _db.delete(classification)
+                        changed = True
+                    else:
+                        # The data source maintains that this
+                        # classification is a good idea. Don't remove it,
+                        # but don't add it again, either.
+                        del new_subjects[key]
+                        surviving_classifications.append(classification)
+                else:
+                    # This classification comes from some other data
+                    # source.  Don't mess with it.
+                    surviving_classifications.append(classification)
+            target.classifications = surviving_classifications
+
+        # Apply all new subjects to the identifier.
+        for subject in new_subjects.values():
+            target.classify(
+                data_source, subject.type, subject.identifier,
+                subject.name, weight=subject.weight
             )
             changed = True
         return changed
