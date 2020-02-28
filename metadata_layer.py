@@ -1665,7 +1665,7 @@ class Metadata(MetaToModelUtility):
         :param metadata_client: A MetadataWranglerOPDSLookup.
 
         :param replace: A ReplacementPolicy. The default is to treat the
-            Metadata as a reliable source of metadata but not of circulation
+            Metadata as a reliable source of metadata, but not of circulation
             or format data.
 
         :return: A 2-tuple (`edition`, `made_core_changes`). `edition`
@@ -1724,84 +1724,15 @@ class Metadata(MetaToModelUtility):
 
         ignore = self.update_identifiers(identifier, replace.identifiers)
 
-        classifications_changed = self.update_classifications(identifier)
+        classifications_changed = self.update_classifications(
+            identifier, replace.subjects
+        )
         if classifications_changed:
             work_requires_full_recalculation = True
 
-        # Associate all links with the primary identifier.
-        if replace.links and self.links is not None:
-            surviving_hyperlinks = []
-            dirty = False
-            for hyperlink in identifier.links:
-                if hyperlink.data_source == data_source:
-                    _db.delete(hyperlink)
-                    dirty = True
-                else:
-                    surviving_hyperlinks.append(hyperlink)
-            if dirty:
-                identifier.links = surviving_hyperlinks
-
-        link_objects = {}
-
-        for link in self.links:
-            if link.rel in Hyperlink.METADATA_ALLOWED:
-                original_resource = None
-                if link.original:
-                    rights_status = RightsStatus.lookup(_db, link.original.rights_uri)
-                    original_resource, ignore = get_one_or_create(
-                        _db, Resource, url=link.original.href,
-                    )
-                    if not original_resource.data_source:
-                        original_resource.data_source = data_source
-                    original_resource.rights_status = rights_status
-                    original_resource.rights_explanation = link.original.rights_explanation
-                    if link.original.content:
-                        original_resource.set_fetched_content(
-                            link.original.guessed_media_type,
-                            link.original.content, None)
-
-                link_obj, ignore = identifier.add_link(
-                    rel=link.rel, href=link.href, data_source=data_source,
-                    media_type=link.guessed_media_type,
-                    content=link.content, rights_status_uri=link.rights_uri,
-                    rights_explanation=link.rights_explanation,
-                    original_resource=original_resource,
-                    transformation_settings=link.transformation_settings,
-                )
-                if link.rel in self.REL_REQUIRES_NEW_PRESENTATION_EDITION:
-                    work_requires_new_presentation_edition = True
-                elif link.rel in self.REL_REQUIRES_FULL_RECALCULATION:
-                    work_requires_full_recalculation = True
-
-            link_objects[link] = link_obj
-            if link.thumbnail:
-                if link.thumbnail.rel == Hyperlink.THUMBNAIL_IMAGE:
-                    thumbnail = link.thumbnail
-                    thumbnail_obj, ignore = identifier.add_link(
-                        rel=thumbnail.rel, href=thumbnail.href,
-                        data_source=data_source,
-                        media_type=thumbnail.guessed_media_type,
-                        content=thumbnail.content
-                    )
-                    work_requires_new_presentation_edition = True
-                    if (thumbnail_obj.resource
-                        and thumbnail_obj.resource.representation):
-                        thumbnail_obj.resource.representation.thumbnail_of = (
-                            link_obj.resource.representation
-                        )
-                    else:
-                        self.log.error(
-                            "Thumbnail link %r cannot be marked as a thumbnail of %r because it has no Representation, probably due to a missing media type." % (
-                                link.thumbnail, link
-                            )
-                        )
-                else:
-                    self.log.error(
-                        "Thumbnail link %r does not have the thumbnail link relation! Not acceptable as a thumbnail of %r." % (
-                            link.thumbnail, link
-                        )
-                    )
-                    link.thumbnail = None
+        links_require_new_presentation_edition, links_require_full_recalculation, link_objects = self.update_links(identifier, replace.links)
+        work_requires_new_presentation_edition = work_requires_new_presentation_edition or links_require_new_presentation_edition
+        work_requires_full_recalculation = work_requires_full_recalculation or links_require_full_recalculation
 
         # Apply all measurements to the primary identifier
         for measurement in self.measurements:
@@ -2167,6 +2098,100 @@ class Metadata(MetaToModelUtility):
             )
             changed = True
         return changed
+
+    def update_links(self, identifier, replace=True):
+        """Associate all links with the given Identifier.
+
+        :param identifier: An Identifier.
+        :param replace: If this is True, then self.links will _replace_
+            any previous links from this data source, rather than
+            adding to the list.
+
+        :return: A 2-tuple (work_requires_new_presentation_edition,
+            work_requires_full_recalculation).
+        """
+        work_requires_new_presentation_edition=False
+        work_requires_full_recalculation=False
+        _db = Session.object_session(identifier)
+        data_source = self.data_source(_db)
+
+        if replace and self.links is not None:
+            # Remove all Hyperlinks from this data source; we will
+            # hopefully be adding most of these back later.
+            surviving_hyperlinks = []
+            dirty = False
+            for hyperlink in identifier.links:
+                if hyperlink.data_source == data_source:
+                    _db.delete(hyperlink)
+                    dirty = True
+                else:
+                    surviving_hyperlinks.append(hyperlink)
+            if dirty:
+                identifier.links = surviving_hyperlinks
+
+        link_objects = {}
+        links = (self.links or [])
+        for link in links:
+            if link.rel in Hyperlink.METADATA_ALLOWED:
+                original_resource = None
+                if link.original:
+                    rights_status = RightsStatus.lookup(_db, link.original.rights_uri)
+                    original_resource, ignore = get_one_or_create(
+                        _db, Resource, url=link.original.href,
+                    )
+                    if not original_resource.data_source:
+                        original_resource.data_source = data_source
+                    original_resource.rights_status = rights_status
+                    original_resource.rights_explanation = link.original.rights_explanation
+                    if link.original.content:
+                        original_resource.set_fetched_content(
+                            link.original.guessed_media_type,
+                            link.original.content, None)
+
+                link_obj, ignore = identifier.add_link(
+                    rel=link.rel, href=link.href, data_source=data_source,
+                    media_type=link.guessed_media_type,
+                    content=link.content, rights_status_uri=link.rights_uri,
+                    rights_explanation=link.rights_explanation,
+                    original_resource=original_resource,
+                    transformation_settings=link.transformation_settings,
+                )
+                if link.rel in self.REL_REQUIRES_NEW_PRESENTATION_EDITION:
+                    work_requires_new_presentation_edition = True
+                elif link.rel in self.REL_REQUIRES_FULL_RECALCULATION:
+                    work_requires_full_recalculation = True
+
+            link_objects[link] = link_obj
+            if link.thumbnail:
+                if link.thumbnail.rel == Hyperlink.THUMBNAIL_IMAGE:
+                    thumbnail = link.thumbnail
+                    thumbnail_obj, ignore = identifier.add_link(
+                        rel=thumbnail.rel, href=thumbnail.href,
+                        data_source=data_source,
+                        media_type=thumbnail.guessed_media_type,
+                        content=thumbnail.content
+                    )
+                    work_requires_new_presentation_edition = True
+                    if (thumbnail_obj.resource
+                        and thumbnail_obj.resource.representation):
+                        thumbnail_obj.resource.representation.thumbnail_of = (
+                            link_obj.resource.representation
+                        )
+                    else:
+                        self.log.error(
+                            "Thumbnail link %r cannot be marked as a thumbnail of %r because it has no Representation, probably due to a missing media type." % (
+                                link.thumbnail, link
+                            )
+                        )
+                else:
+                    self.log.error(
+                        "Thumbnail link %r does not have the thumbnail link relation! Not acceptable as a thumbnail of %r." % (
+                            link.thumbnail, link
+                        )
+                    )
+                    link.thumbnail = None
+        return (work_requires_new_presentation_edition,
+                work_requires_full_recalculation, link_objects)
 
     def filter_recommendations(self, _db):
         """Filters out recommended identifiers that don't exist in the db.
