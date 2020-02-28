@@ -1700,6 +1700,8 @@ class Metadata(MetaToModelUtility):
         if not self._should_do_update(edition, data_source, replace):
             return edition, False
 
+        # TODO: maybe this should be called even if metadata_client is
+        # None.
         if metadata_client and not self.permanent_work_id:
             self.calculate_permanent_work_id(_db, metadata_client)
 
@@ -1708,36 +1710,19 @@ class Metadata(MetaToModelUtility):
         self.log.info(
             "APPLYING METADATA TO EDITION: %s",  self.title
         )
-        fields = self.BASIC_EDITION_FIELDS+['permanent_work_id']
-        for field in fields:
-            old_edition_value = getattr(edition, field)
-            new_metadata_value = getattr(self, field)
-            if new_metadata_value != None and new_metadata_value != '' and (new_metadata_value != old_edition_value):
-                if new_metadata_value in [NO_VALUE, NO_NUMBER]:
-                    new_metadata_value = None
-                setattr(edition, field, new_metadata_value)
-                work_requires_new_presentation_edition = True
+        work_requires_new_presentation_edition = (
+            self.update_basic_fields(edition)
+        )
 
         # Create equivalencies between all given identifiers and
         # the edition's primary identifier.
-        contributors_changed = self.update_contributions(_db, edition,
-                                  metadata_client, replace.contributions)
+        contributors_changed = self.update_contributions(
+            _db, edition, metadata_client, replace.contributions
+        )
         if contributors_changed:
             work_requires_new_presentation_edition = True
 
-        # TODO: remove equivalencies when replace.identifiers is True.
-        if self.identifiers is not None:
-            for identifier_data in self.identifiers:
-                if not identifier_data.identifier:
-                    continue
-                if (identifier_data.identifier==identifier.identifier and
-                    identifier_data.type==identifier.type):
-                    # These are the same identifier.
-                    continue
-                new_identifier, ignore = Identifier.for_foreign_id(
-                    _db, identifier_data.type, identifier_data.identifier)
-                identifier.equivalent_to(
-                    data_source, new_identifier, identifier_data.weight)
+        self.update_identifiers(identifier, replace.identifiers)
 
         new_subjects = {}
         if self.subjects:
@@ -2023,6 +2008,28 @@ class Metadata(MetaToModelUtility):
         # The Edition was updated after the Metadata; no need to update.
         return False
 
+    def update_basic_fields(self, edition):
+        """Copy basic field data -- title and so on -- into an Edition.
+
+        :param edition: An Edition.
+        :return: True if any of the basic fields actually changed.
+        """
+        changed = False
+        fields = self.BASIC_EDITION_FIELDS+['permanent_work_id']
+        for field in fields:
+            old_edition_value = getattr(edition, field)
+            new_metadata_value = getattr(self, field)
+            if new_metadata_value in (None, ''):
+                continue
+            if new_metadata_value == old_edition_value:
+                continue
+            if new_metadata_value in [NO_VALUE, NO_NUMBER]:
+                new_metadata_value = None
+            setattr(edition, field, new_metadata_value)
+            changed = True
+
+        return changed
+
     def make_thumbnail(self, data_source, link, link_obj):
         """Make sure a Hyperlink representing an image is connected
         to its thumbnail.
@@ -2110,6 +2117,36 @@ class Metadata(MetaToModelUtility):
 
         return contributors_changed
 
+    def update_identifiers(self, target, replace=False):
+        """Mark this Metadata's IdentifierData objects as equivalent to the
+        given Identifier.
+
+        :param _db: A database connection.
+        :param target: An Identifier.
+        :param replace: Set this to true and any equivalent Identifiers
+           previously set from this data source will be removed if they 
+           are not _currently_ present. TODO: This is not implemented.
+        :return: True if any changes were made.
+        """
+        changed = False
+        _db = Session.object_session(target)
+        data_source = self.data_source(_db)
+        for identifier_data in (self.identifiers or []):
+            if not identifier_data.identifier:
+                # The IdentifierData is incomplete; ignore it.
+                continue
+            if (identifier_data.identifier==target.identifier and
+                identifier_data.type==target.type):
+                # These are the same identifier.
+                continue
+            new_identifier, ignore = Identifier.for_foreign_id(
+                _db, identifier_data.type, identifier_data.identifier
+            )
+            target.equivalent_to(
+                data_source, new_identifier, identifier_data.weight
+            )
+            changed = True
+        return changed
 
     def filter_recommendations(self, _db):
         """Filters out recommended identifiers that don't exist in the db.
