@@ -1714,14 +1714,15 @@ class Metadata(MetaToModelUtility):
             self.update_basic_fields(edition)
         )
 
-        # Create equivalencies between all given identifiers and
-        # the edition's primary identifier.
+        # This also ensures that Edition.sort_author is set.
         contributors_changed = self.update_contributions(
             _db, edition, metadata_client, replace.contributions
         )
         if contributors_changed:
             work_requires_new_presentation_edition = True
 
+        # Create equivalencies between all given identifiers and
+        # the edition's primary identifier. 
         ignore = self.update_identifiers(identifier, replace.identifiers)
 
         classifications_changed = self.update_classifications(
@@ -1739,11 +1740,6 @@ class Metadata(MetaToModelUtility):
         )
         # If any measurements are added, the work needs a full recalculation.
         work_requires_full_recalculation = work_requires_full_recalculation or measurements_changed
-
-        # Make sure sort_author is set, even if there are no
-        # Contributor objects.
-        sort_author_changed = self.ensure_sort_author(edition)
-        work_requires_new_presentation_edition = work_requires_new_presentation_edition or sort_author_changed
 
         # The Metadata object may include a CirculationData object which
         # contains information about availability such as open-access
@@ -1994,6 +1990,28 @@ class Metadata(MetaToModelUtility):
         if sorted(old_contributors) != sorted(new_contributors):
             contributors_changed = True
 
+        # In some cases we can set edition.sort_author even if there are
+        # no contributors.
+        #
+        # This can happen in a situation like the NYT best-seller list,
+        # where we know the display name of the author but weren't able
+        # to normalize that name.
+        #
+        # TODO this doesn't seem right. self.primary_author won't work
+        # if there are no contributors! I think this only sets
+        # Edition.primary_author slightly before it would be set
+        # otherwise, by Edition.calculate_presentation().
+        primary_author = self.primary_author
+        if primary_author and not edition.sort_author:
+            self.log.info(
+                "In the absence of Contributor objects, setting Edition author name to %s/%s",
+                primary_author.sort_name,
+                primary_author.display_name
+            )
+            edition.sort_author = primary_author.sort_name
+            edition.display_author = primary_author.display_name
+            contributors_changed = True
+
         return contributors_changed
 
     def update_identifiers(self, target, replace=False):
@@ -2196,32 +2214,6 @@ class Metadata(MetaToModelUtility):
             )
             changed = True
         return changed
-
-    def ensure_sort_author(self, edition):
-        """Set Edition.sort_author based on this Metadata, even if 
-        there is no Contributor data for the Edition.
-
-        This can happen in a situation like the NYT best-seller list,
-        where we know the display name of the author but weren't able
-        to normalize that name.
-        """
-        if edition.sort_author:
-            # We already have a sort_author.
-            return False
-
-        primary_author = self.primary_author
-        if not primary_author:
-            # We don't know anything about the author.
-            return False
-
-        self.log.info(
-            "In the absence of Contributor objects, setting Edition author name to %s/%s",
-            primary_author.sort_name,
-            primary_author.display_name
-        )
-        edition.sort_author = primary_author.sort_name
-        edition.display_author = primary_author.display_name
-        return True
 
     def filter_recommendations(self, _db):
         """Filters out recommended identifiers that don't exist in the db.
