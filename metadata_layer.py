@@ -1749,40 +1749,16 @@ class Metadata(MetaToModelUtility):
         if self.circulation:
             self.circulation.apply(_db, collection, replace)
 
-        # Make sure the work we just did shows up. This needs to happen after mirroring
-        # so mirror urls are available.
+        # Make sure all the work we just did shows up in the
+        # presentation Edition.
         made_changes = edition.calculate_presentation(
             policy=replace.presentation_calculation_policy
         )
         if made_changes:
             work_requires_new_presentation_edition = True
 
-        # The metadata wrangler doesn't need information from these data sources.
-        # We don't need to send it information it originally provided, and
-        # Overdrive makes metadata accessible to everyone without buying licenses
-        # for the book, so the metadata wrangler can obtain it directly from
-        # Overdrive.
-        # TODO: Remove Bibliotheca and Axis 360 from this list.
-        METADATA_UPLOAD_BLACKLIST = [
-            DataSource.METADATA_WRANGLER,
-            DataSource.OVERDRIVE,
-            DataSource.BIBLIOTHECA,
-            DataSource.AXIS_360,
-        ]
-        if work_requires_new_presentation_edition and (not data_source.integration_client) and (data_source.name not in METADATA_UPLOAD_BLACKLIST):
-            # Create a transient failure CoverageRecord for this edition
-            # so it will be processed by the MetadataUploadCoverageProvider.
-            internal_processing = DataSource.lookup(_db, DataSource.INTERNAL_PROCESSING)
-
-            # If there's already a CoverageRecord, don't change it to transient failure.
-            # TODO: Once the metadata wrangler can handle it, we'd like to re-sync the
-            # metadata every time there's a change. For now,
-            cr = CoverageRecord.lookup(edition, internal_processing,
-                                       operation=CoverageRecord.METADATA_UPLOAD_OPERATION)
-            if not cr:
-                CoverageRecord.add_for(edition, internal_processing,
-                                       operation=CoverageRecord.METADATA_UPLOAD_OPERATION,
-                                       status=CoverageRecord.TRANSIENT_FAILURE)
+        if work_requires_new_presentation_edition and not data_source.integration_client:
+            self.register_with_metadata_wrangler(edition)
 
         # Update the coverage record for this edition and data
         # source. We omit the collection information, even if we know
@@ -2214,6 +2190,45 @@ class Metadata(MetaToModelUtility):
             )
             changed = True
         return changed
+
+    def register_with_metadata_wrangler(self, edition):
+        _db = Session.object_session(edition)
+        data_source = self.data_source(_db)
+        # The metadata wrangler doesn't need information from these data sources.
+        # We don't need to send it information it originally provided, and
+        # Overdrive makes metadata accessible to everyone without buying licenses
+        # for the book, so the metadata wrangler can obtain it directly from
+        # Overdrive.
+        # TODO: Remove Bibliotheca and Axis 360 from this list.
+        METADATA_UPLOAD_BLACKLIST = [
+            DataSource.METADATA_WRANGLER,
+            DataSource.OVERDRIVE,
+            DataSource.BIBLIOTHECA,
+            DataSource.AXIS_360,
+        ]
+        if data_source.integration_client:
+            return
+        if data_source.name in METADATA_UPLOAD_BLACKLIST:
+            return
+
+        # Create a transient failure CoverageRecord for this edition
+        # so it will be processed by the MetadataUploadCoverageProvider.
+        internal_processing = DataSource.lookup(_db, DataSource.INTERNAL_PROCESSING)
+
+        # If there's already a CoverageRecord, don't change it to transient failure.
+        # TODO: Once the metadata wrangler can handle it, we'd like to re-sync the
+        # metadata every time there's a change. For now,
+        cr = CoverageRecord.lookup(
+            edition, internal_processing,
+            operation=CoverageRecord.METADATA_UPLOAD_OPERATION
+        )
+        if cr:
+            return
+        CoverageRecord.add_for(
+            edition, internal_processing,
+            operation=CoverageRecord.METADATA_UPLOAD_OPERATION,
+            status=CoverageRecord.TRANSIENT_FAILURE
+        )
 
     def filter_recommendations(self, _db):
         """Filters out recommended identifiers that don't exist in the db.
