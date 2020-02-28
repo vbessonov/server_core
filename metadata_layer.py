@@ -1731,7 +1731,7 @@ class Metadata(MetaToModelUtility):
         if classifications_changed:
             work_requires_full_recalculation = True
 
-        links_require_new_presentation_edition, links_require_full_recalculation, link_objects = self.update_links(identifier, replace.links)
+        links_require_new_presentation_edition, links_require_full_recalculation = self.update_links(edition, replace)
         work_requires_new_presentation_edition = work_requires_new_presentation_edition or links_require_new_presentation_edition
         work_requires_full_recalculation = work_requires_full_recalculation or links_require_full_recalculation
 
@@ -1748,25 +1748,6 @@ class Metadata(MetaToModelUtility):
         # its information is up-to-date.
         if self.circulation:
             self.circulation.apply(_db, collection, replace)
-
-        has_image = any([link.rel == Hyperlink.IMAGE for link in self.links])
-        for link in self.links:
-            link_obj = link_objects[link]
-
-            if link_obj.rel == Hyperlink.THUMBNAIL_IMAGE and has_image:
-                # This is a thumbnail but we also have a full-sized image link,
-                # so we don't need to separately mirror the thumbnail.
-                continue
-
-            if replace.mirrors:
-                # We need to mirror this resource. If it's an image, a
-                # thumbnail may be provided as a side effect.
-                self.mirror_link(edition, data_source, link, link_obj, replace)
-            elif link.thumbnail:
-                # We don't need to mirror this image, but we do need
-                # to make sure that its thumbnail exists locally and
-                # is associated with the original image.
-                self.make_thumbnail(data_source, link, link_obj)
 
         # Make sure the work we just did shows up. This needs to happen after mirroring
         # so mirror urls are available.
@@ -2103,23 +2084,22 @@ class Metadata(MetaToModelUtility):
             changed = True
         return changed
 
-    def update_links(self, identifier, replace=True):
+    def update_links(self, edition, policy):
         """Associate all links with the given Identifier.
 
-        :param identifier: An Identifier.
-        :param replace: If this is True, then self.links will _replace_
-            any previous links from this data source, rather than
-            adding to the list.
+        :param edition: An Edition.
+        :param policy: A ReplacementPolicy
 
         :return: A 2-tuple (work_requires_new_presentation_edition,
             work_requires_full_recalculation).
         """
         work_requires_new_presentation_edition=False
         work_requires_full_recalculation=False
-        _db = Session.object_session(identifier)
+        _db = Session.object_session(edition)
+        identifier = edition.primary_identifier
         data_source = self.data_source(_db)
 
-        if replace and self.links is not None:
+        if policy.links and self.links is not None:
             # Remove all Hyperlinks from this data source; we will
             # hopefully be adding most of these back later.
             surviving_hyperlinks = []
@@ -2194,8 +2174,28 @@ class Metadata(MetaToModelUtility):
                         )
                     )
                     link.thumbnail = None
+
+        has_image = any([link.rel == Hyperlink.IMAGE for link in self.links])
+        for link in self.links:
+            link_obj = link_objects[link]
+
+            if link_obj.rel == Hyperlink.THUMBNAIL_IMAGE and has_image:
+                # This is a thumbnail but we also have a full-sized image link,
+                # so we don't need to separately mirror the thumbnail.
+                continue
+
+            if policy.mirrors:
+                # We need to mirror this resource. If it's an image, a
+                # thumbnail may be provided as a side effect.
+                self.mirror_link(edition, data_source, link, link_obj, policy)
+            elif link.thumbnail:
+                # We don't need to mirror this image, but we do need
+                # to make sure that its thumbnail exists locally and
+                # is associated with the original image.
+                self.make_thumbnail(data_source, link, link_obj)
+
         return (work_requires_new_presentation_edition,
-                work_requires_full_recalculation, link_objects)
+                work_requires_full_recalculation)
 
     def update_measurements(self, target):
         """Apply all MeasurementData to the target Identifier.
