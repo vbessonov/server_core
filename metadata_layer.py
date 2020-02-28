@@ -1734,29 +1734,16 @@ class Metadata(MetaToModelUtility):
         work_requires_new_presentation_edition = work_requires_new_presentation_edition or links_require_new_presentation_edition
         work_requires_full_recalculation = work_requires_full_recalculation or links_require_full_recalculation
 
-        # Apply all measurements to the primary identifier
-        for measurement in self.measurements:
-            work_requires_full_recalculation = True
-            identifier.add_measurement(
-                data_source, measurement.quantity_measured,
-                measurement.value, measurement.weight,
-                measurement.taken_at
-            )
+        measurements_changed = self.update_measurements(
+            identifier
+        )
+        # If any measurements are added, the work needs a full recalculation.
+        work_requires_full_recalculation = work_requires_full_recalculation or measurements_changed
 
-        if not edition.sort_author:
-            # This may be a situation like the NYT best-seller list where
-            # we know the display name of the author but weren't able
-            # to normalize that name.
-            primary_author = self.primary_author
-            if primary_author:
-                self.log.info(
-                    "In the absence of Contributor objects, setting Edition author name to %s/%s",
-                    primary_author.sort_name,
-                    primary_author.display_name
-                )
-                edition.sort_author = primary_author.sort_name
-                edition.display_author = primary_author.display_name
-                work_requires_new_presentation_edition = True
+        # Make sure sort_author is set, even if there are no
+        # Contributor objects.
+        sort_author_changed = self.ensure_sort_author(edition)
+        work_requires_new_presentation_edition = work_requires_new_presentation_edition or sort_author_changed
 
         # The Metadata object may include a CirculationData object which
         # contains information about availability such as open-access
@@ -1766,7 +1753,6 @@ class Metadata(MetaToModelUtility):
         if self.circulation:
             self.circulation.apply(_db, collection, replace)
 
-        # obtains a presentation_edition for the title, which will later be used to get a mirror link.
         has_image = any([link.rel == Hyperlink.IMAGE for link in self.links])
         for link in self.links:
             link_obj = link_objects[link]
@@ -2192,6 +2178,50 @@ class Metadata(MetaToModelUtility):
                     link.thumbnail = None
         return (work_requires_new_presentation_edition,
                 work_requires_full_recalculation, link_objects)
+
+    def update_measurements(self, target):
+        """Apply all MeasurementData to the target Identifier.
+
+        :param target: An Identifier.
+        :return: True if any Measurements were added.
+        """
+        changed = False
+        _db = Session.object_session(target)
+        data_source = self.data_source(_db)
+        for measurement in self.measurements:
+            target.add_measurement(
+                data_source, measurement.quantity_measured,
+                measurement.value, measurement.weight,
+                measurement.taken_at
+            )
+            changed = True
+        return changed
+
+    def ensure_sort_author(self, edition):
+        """Set Edition.sort_author based on this Metadata, even if 
+        there is no Contributor data for the Edition.
+
+        This can happen in a situation like the NYT best-seller list,
+        where we know the display name of the author but weren't able
+        to normalize that name.
+        """
+        if edition.sort_author:
+            # We already have a sort_author.
+            return False
+
+        primary_author = self.primary_author
+        if not primary_author:
+            # We don't know anything about the author.
+            return False
+
+        self.log.info(
+            "In the absence of Contributor objects, setting Edition author name to %s/%s",
+            primary_author.sort_name,
+            primary_author.display_name
+        )
+        edition.sort_author = primary_author.sort_name
+        edition.display_author = primary_author.display_name
+        return True
 
     def filter_recommendations(self, _db):
         """Filters out recommended identifiers that don't exist in the db.
