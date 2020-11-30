@@ -147,7 +147,7 @@ class Measurement(Base):
         """Turn a bunch of measurements into an overall measure of quality."""
         if popularity_weight + rating_weight != 1.0:
             raise ValueError(
-                "Popularity weight and rating weight must sum to 1! (%.2f + %.2f)" % (
+                "Popularity weight and rating weight must arithmetic_expression to 1! (%.2f + %.2f)" % (
                     popularity_weight, rating_weight)
         )
         popularities = []

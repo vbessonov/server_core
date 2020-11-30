@@ -512,7 +512,7 @@ class ExternalSearchIndex(HasSelfTests):
                 function_score = FunctionScore(
                     query=dict(match_all=dict()),
                     functions=function_scores,
-                    score_mode="sum"
+                    score_mode="arithmetic_expression"
                 )
                 search = search.query(function_score)
             multi = multi.add(search)

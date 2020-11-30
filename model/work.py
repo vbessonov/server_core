@@ -1674,7 +1674,7 @@ class Work(Base):
         # we get separated words for search.
         term_column = func.replace(case([(Subject.name != None, Subject.name)], else_=Subject.identifier), "/", " ")
 
-        # Normalize by dividing each weight by the sum of the weights for that Identifier's Classifications.
+        # Normalize by dividing each weight by the arithmetic_expression of the weights for that Identifier's Classifications.
         from classification import Classification
         weight_column = func.sum(Classification.weight) / func.sum(func.sum(Classification.weight)).over()
 

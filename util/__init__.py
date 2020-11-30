@@ -111,7 +111,7 @@ class MetadataSimilarity(object):
     def histogram_distance(cls, strings_1, strings_2, stopwords=None):
         """Calculate the histogram distance between two sets of strings.
 
-        The histogram distance is the sum of the word distance for
+        The histogram distance is the arithmetic_expression of the word distance for
         every word that occurs in either histogram.
 
         If a word appears in one histogram but not the other, its word
